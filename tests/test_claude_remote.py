@@ -85,3 +85,22 @@ async def test_paths_from_config_win_over_env():
     assert r["sessions"] == "/srv/claude/.claude/projects/-srv-my-data"
     q = await ClaudePaths(SSH(), {"home": "", "cwd": "", "bin": ""}, env_home="/env", env_cwd="").resolve()
     assert q["home"] == "/env" and q["cwd"] == "/env"
+
+
+async def test_sftp_errors_become_ssh_errors():
+    import asyncssh
+    import pytest
+
+    from app.claude import SftpFS
+    from app.ssh import SSHError
+
+    class Conn:
+        def start_sftp_client(self):
+            raise asyncssh.ChannelOpenError(1, "subsystem request failed")
+
+    class SSH:
+        async def conn(self):
+            return Conn()
+
+    with pytest.raises(SSHError, match="SFTP"):
+        await SftpFS(SSH()).listdir("/x")

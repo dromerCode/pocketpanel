@@ -277,14 +277,27 @@ class SftpFS:
     def __init__(self, ssh):
         self.ssh = ssh
 
+    async def _do(self, fn):
+        from asyncssh import Error, SFTPNoSuchFile
+        from .ssh import SSHError
+        try:
+            async with (await self.ssh.conn()).start_sftp_client() as sftp:
+                return await fn(sftp)
+        except SFTPNoSuchFile:
+            raise
+        except (Error, OSError) as e:
+            raise SSHError(f"no se pueden leer las sesiones por SFTP: {e}") from e
+
     async def listdir(self, folder: str) -> list:
-        async with (await self.ssh.conn()).start_sftp_client() as sftp:
+        async def go(sftp):
             return [(n.filename, n.attrs.mtime or 0, n.attrs.size or 0) for n in await sftp.readdir(folder)]
+        return await self._do(go)
 
     async def read_text(self, path: str) -> str:
-        async with (await self.ssh.conn()).start_sftp_client() as sftp:
+        async def go(sftp):
             async with sftp.open(path, "rb") as f:
                 return (await f.read()).decode("utf-8", errors="replace")
+        return await self._do(go)
 
 
 class SessionStore:
