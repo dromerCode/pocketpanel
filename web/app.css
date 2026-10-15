@@ -67,7 +67,8 @@ a { color: inherit; }
   background: rgb(24 25 28 / .7); border: 1px solid var(--line); border-radius: 22px; backdrop-filter: blur(6px);
   animation: rise .35s ease-out;
 }
-.login-logo { width: 76px; height: 76px; margin: 0 auto; filter: drop-shadow(0 8px 24px rgb(166 227 110 / .25)); }
+.login-box > * { min-width: 0; width: 100%; }  /* un input en grid no encoge solo: se salía de la tarjeta */
+.login-box > .login-logo { width: 76px; height: 76px; margin: 0 auto; filter: drop-shadow(0 8px 24px rgb(166 227 110 / .25)); }
 .login-box h1 { margin: 0 0 8px; font-size: 24px; letter-spacing: -.01em; }
 @keyframes rise { from { transform: translateY(14px); opacity: 0; } }
 .login-box input {

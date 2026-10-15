@@ -53,17 +53,15 @@ cd ~/pocketpanel
 ./install.sh                 # run as your normal user, not root
 ```
 
-The installer builds the image, creates an SSH key that the panel uses to reach the host (restricted to
-`from="127.0.0.1"` in your `~/.ssh/authorized_keys`), writes `.env`, copies `config.yml` / `actions.yml` from
-the examples and prints your PIN.
+That's the only command. The installer builds the image, creates an SSH key that the panel uses to reach the
+host (restricted to `from="127.0.0.1"`), offers to publish the panel on your tailnet with HTTPS
+(`tailscale serve`, needed for the installable app and push notifications) and prints a **QR code**.
 
-Then expose it to your tailnet with HTTPS (needed to install the app and for push notifications):
+Scan it with your phone: it opens a **setup wizard** (server name, time zone, PIN, which modules you want with
+their options and a live requirements check, notifications, adding it to your home screen) and finishes with a
+short **guided tour**. No files to edit.
 
-```sh
-sudo tailscale serve --bg --https=8443 http://127.0.0.1:9300
-```
-
-and open `https://<server>.<your-tailnet>.ts.net:8443` on your phone → browser menu → *Install app*.
+<p align="center"><img src="docs/screenshots/setup.png" alt="Setup wizard and guided tour" width="100%"></p>
 
 ### Configure
 
@@ -134,20 +132,15 @@ cd ~/pocketpanel
 ./install.sh
 ```
 
-Al final te enseña el **PIN**: apúntalo.
+Si tienes Tailscale, te pregunta si lo publica en tu tailnet (te pedirá la contraseña de sudo) y al final saca
+un **código QR**. Escanéalo con el móvil (conectado a tu tailnet): se abre un **asistente** que te pide el nombre
+del servidor, la zona horaria, tu **PIN** y qué módulos quieres (con sus opciones y comprobando en el servidor que
+tienes lo necesario), y termina con un **tutorial** de la app. No hay que editar ningún archivo.
 
-**2. Abrirlo desde el móvil por Tailscale:**
+Si no te sale el QR, abre la dirección que te enseña y mete el **código de instalación** que aparece debajo.
+Para tenerla como una app: menú del navegador → **"Instalar aplicación"** / "Añadir a pantalla de inicio".
 
-```sh
-sudo tailscale serve --bg --https=8443 http://127.0.0.1:9300
-```
-
-En el móvil (conectado a tu tailnet) entra en `https://<nombre-del-servidor>.<tu-tailnet>.ts.net:8443`
-(el nombre exacto sale con `tailscale status` o en el panel de Tailscale), mete el PIN y en el menú del
-navegador dale a **"Instalar aplicación"** / "Añadir a pantalla de inicio". En Estado, la campanita 🔕 activa
-los avisos push.
-
-**3. Activar módulos** (opcional): en la app, **Estado → ⚙**. Es una "tienda" con todos los módulos (backups,
+**2. Cambiar cosas más tarde** (opcional): en la app, **Estado → ⚙**. Es una "tienda" con todos los módulos (backups,
 RAID, Claude, usuarios de Jellyfin…): tocas uno, lo activas, rellenas sus opciones, pulsas **Comprobar requisitos**
 (mira en el servidor si tienes lo necesario) y **Guardar y reiniciar**. El panel se reinicia solo en un par de
 segundos. En "Ajustes generales" cambias el nombre del servidor, los discos que se ven, etc.
