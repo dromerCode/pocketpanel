@@ -8,3 +8,4 @@ uploads/
 config.yml
 actions.yml
 .superpowers/
+.playwright-cli/
