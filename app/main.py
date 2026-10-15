@@ -192,6 +192,19 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
             save_secrets(cfg.data_dir, name, secret)
         return _save(module=name, enabled=enabled, values=values)
 
+    @app.post("/api/modules/{name}/check", dependencies=authed)
+    async def check(name: str, request: Request):
+        from .requirements import check_module
+        if name not in CATALOG:
+            raise HTTPException(404, "módulo desconocido")
+        given = (await json_body(request)).get("values") or {}
+        values = {**saved_values(cfg.config_path, name), **load_secrets(cfg.data_dir).get(name, {})}
+        values.update({k: v for k, v in given.items() if v not in (None, "") or k not in secret_keys(name)})
+        if name == "jellyfin":
+            values.setdefault("jfa_user", cfg.jfa_user)
+            values.setdefault("jfa_pass", cfg.jfa_pass)
+        return await check_module(name, values, ctx.ssh)
+
     @app.put("/api/settings", dependencies=authed)
     async def save_settings(request: Request):
         b = await json_body(request)

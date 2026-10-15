@@ -82,3 +82,22 @@ def test_requires_auth(tmp_path):
     c.cookies.clear()
     assert c.get("/api/modules").status_code == 401
     assert c.put("/api/settings", json={"values": {}}).status_code == 401
+
+
+def test_check_uses_proposed_values(tmp_path):
+    c, _, _ = make(tmp_path)
+
+    class SSH:
+        cmds = []
+
+        async def run(self, cmd, timeout=15):
+            self.cmds.append(cmd)
+            return "PPCHK|device|1|error|\nPPCHK|mdadm|1|warn|\nPPCHK|smartctl|0|warn|\n"
+
+    ssh = SSH()
+    c.app.state.ctx.ssh = ssh
+    r = c.post("/api/modules/raid/check", json={"values": {"device": "/dev/md9"}})
+    assert r.status_code == 200
+    assert [x["ok"] for x in r.json()] == [True, True, False]
+    assert "/dev/md9" in ssh.cmds[0]
+    assert c.post("/api/modules/nope/check", json={"values": {}}).status_code == 404
