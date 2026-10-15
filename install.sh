@@ -30,8 +30,9 @@ mkdir -p ssh data uploads
 # --- clave SSH del panel para entrar en este host (solo desde 127.0.0.1) ---
 [ -f ssh/id_ed25519 ] || ssh-keygen -q -t ed25519 -N "" -C pocketpanel -f ssh/id_ed25519
 pub=$(cut -d' ' -f1,2 ssh/id_ed25519.pub)
-mkdir -p ~/.ssh && chmod 700 ~/.ssh
-touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys
+mkdir -p ~/.ssh
+[ -O ~/.ssh ] && chmod 700 ~/.ssh   # en algunos sistemas (p. ej. ZimaOS) ~/.ssh no es del usuario: no tocarlo
+[ -e ~/.ssh/authorized_keys ] || { touch ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys; }
 if ! grep -qF "$pub" ~/.ssh/authorized_keys; then
   echo "from=\"127.0.0.1\" $pub pocketpanel" >> ~/.ssh/authorized_keys
   echo "✓ clave del panel añadida a ~/.ssh/authorized_keys (solo desde 127.0.0.1)"
