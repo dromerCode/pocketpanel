@@ -8,6 +8,8 @@ from typing import Mapping
 
 import yaml
 
+from .secrets import load_secrets
+
 
 class ConfigError(Exception):
     pass
@@ -20,7 +22,7 @@ MODULE_DEFAULTS: dict[str, dict] = {
     "terminal": {"enabled": True},
     "actions": {"enabled": True},
     "updates": {"enabled": True, "check_at": "05:30"},
-    "claude": {"enabled": False, "bin": "", "permission_mode": "", "report_at": "09:00", "report_notes": "", "diagnosis": ""},
+    "claude": {"enabled": False, "home": "", "cwd": "", "bin": "", "permission_mode": "", "report_at": "09:00", "report_notes": "", "diagnosis": ""},
     "backups": {"enabled": False, "source": "", "dest": "", "ssh_key": "", "ssh_options": "", "at": "04:00", "keep_days": 7,
                 "excludes": ["cache/", "Cache/", "logs/", "log/", "*.log", "transcodes/"]},
     "raid": {"enabled": False, "device": "/dev/md0", "ssh": "", "ssh_options": "", "sudo": False},
@@ -143,6 +145,8 @@ def load_config(path: str | None = None, env: Mapping | None = None) -> Config:
 
     e = env.get
     root = Path(__file__).resolve().parent.parent
+    data_dir = e("PANEL_DATA", "/data")
+    jfa = load_secrets(data_dir).get("jellyfin", {})
     claude_home = e("CLAUDE_HOME", "")
     try:
         ssh_port = int(e("PANEL_SSH_PORT", "22"))
@@ -161,14 +165,14 @@ def load_config(path: str | None = None, env: Mapping | None = None) -> Config:
         docker_sock=e("PANEL_DOCKER_SOCK", "/var/run/docker.sock"),
         web_dir=e("PANEL_WEB", str(root / "web")),
         sessions_dir=e("PANEL_SESSIONS", "/sessions"),
-        data_dir=e("PANEL_DATA", "/data"),
+        data_dir=data_dir,
         uploads_dir=e("PANEL_UPLOADS", "/uploads"),
         actions_file=e("PANEL_ACTIONS", "/config/actions.yml"),
         host_dir=e("PANEL_HOST_DIR", ""),
         claude_home=claude_home,
         claude_cwd=e("CLAUDE_CWD", "") or claude_home,
-        jfa_user=e("PANEL_JFA_USER", ""),
-        jfa_pass=e("PANEL_JFA_PASS", ""),
+        jfa_user=jfa.get("jfa_user") or e("PANEL_JFA_USER", ""),
+        jfa_pass=jfa.get("jfa_pass") or e("PANEL_JFA_PASS", ""),
     )
 
 
