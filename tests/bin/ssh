@@ -1,0 +1,12 @@
+#!/bin/bash
+# ssh de mentira para los tests: ignora opciones y host y ejecuta el comando en local.
+# Como el ssh de verdad, se queda con todo lo que le llegue por stdin (aunque el comando no lo lea).
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -[iopFlJ]) shift 2 ;;
+    -*) shift ;;
+    *) shift; break ;;   # el host
+  esac
+done
+if [ $# -eq 0 ]; then exec bash; fi
+bash -c "$*" < <(cat)

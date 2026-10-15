@@ -1,0 +1,16 @@
+# Acciones rápidas (pestaña Estado). Se recarga sola al abrir la app, no hace falta reiniciar.
+# id: minúsculas/números/guiones · name: texto del botón · cmd: shell en el host (como tu usuario)
+# confirm: true para pedir confirmación antes de ejecutarla
+- id: discos
+  name: Espacio en discos
+  cmd: df -h -x tmpfs -x overlay -x squashfs
+- id: top-ram
+  name: Contenedores que más RAM usan
+  cmd: docker stats --no-stream --format '{{.MemUsage}}\t{{.Name}}' | sort -h -r | head -15
+- id: caidos
+  name: Contenedores parados
+  cmd: docker ps -a --filter status=exited --filter status=dead --format '{{.Names}}\t{{.Status}}'
+- id: limpiar-docker
+  name: Limpiar imágenes de Docker
+  cmd: docker image prune -f && docker builder prune -f
+  confirm: true

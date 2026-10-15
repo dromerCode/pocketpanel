@@ -1,0 +1,6 @@
+name: prueba
+modules:
+  claude: {enabled: true}
+  backups: {enabled: true, source: /srv/appdata, dest: "bk@nas:/backups"}
+  raid: {enabled: true}
+  jellyfin: {enabled: true}

@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.env
+ssh/
+data/
+uploads/
+config.yml
+actions.yml
+.superpowers/

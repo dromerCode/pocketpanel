@@ -1,0 +1,24 @@
+# Lo de ${...} sale del .env que escribe install.sh.
+services:
+  pocketpanel:
+    build: .
+    image: pocketpanel:local
+    container_name: pocketpanel
+    restart: unless-stopped
+    # red del host + escucha solo en 127.0.0.1: desde la LAN no se ve; se publica con `tailscale serve`
+    network_mode: host
+    user: "${PANEL_UID}:${PANEL_GID}"
+    group_add: ["${DOCKER_GID}"]
+    env_file: .env
+    environment:
+      TZ: ${TZ:-Europe/Madrid}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./ssh:/ssh:ro
+      - ./config.yml:/config/config.yml:ro
+      - ./actions.yml:/config/actions.yml:ro
+      - ./data:/data
+      - ./uploads:/uploads
+      - ${CLAUDE_SESSIONS:-./empty}:/sessions:ro
+    labels:
+      icon: https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@master/png/glances.png

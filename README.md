@@ -1,0 +1,116 @@
+# pocketpanel
+
+Your home server in your pocket: a small, self-hosted phone app (PWA) to keep an eye on a Linux + Docker
+server and fix things from the couch. Lightweight (FastAPI + vanilla JS, one container), private by default
+(listens only on `127.0.0.1`, meant to be reached over [Tailscale](https://tailscale.com)) and modular: turn on
+only what you use.
+
+> 🇪🇸 La interfaz está en español. [Instrucciones en español más abajo](#en-español).
+
+## Features
+
+Always on:
+
+- **Status**: CPU, RAM, temperature, disks, uptime and 1 h / 24 h / 7 d history charts.
+- **Containers**: list, start / stop / restart, live logs, open button for each web UI.
+- **Push alerts** (Web Push): a container stops, a disk fills up, a module reports a problem.
+- PIN login with rate limiting, installable as an app on Android / iOS.
+
+Optional modules (`config.yml` → `modules:`):
+
+| Module | What it does | Needs on the host |
+|---|---|---|
+| `terminal` (on) | Full terminal (bash, tmux) on the host over SSH | `tmux` for tmux mode |
+| `actions` (on) | One-tap buttons that run your own commands (`actions.yml`) | – |
+| `updates` (on) | Daily check for newer images, one-tap update with automatic rollback if the new container doesn't come up | – |
+| `claude` | Chat with [Claude Code](https://claude.com/claude-code) running on the server, attach files, daily health report by push | `claude` installed and logged in |
+| `backups` | Nightly incremental backups (rsync + hardlinks) of a folder to another machine over SSH, restore one app's folder from the container sheet | `rsync` on both ends |
+| `raid` | mdadm RAID state + SMART (local or on another box over SSH) | `mdadm`, `smartctl` |
+| `jellyfin` | Manage Jellyfin accounts and invites through [jfa-go](https://github.com/hrfee/jfa-go) | jfa-go |
+
+## Install (Ubuntu / Debian + Docker + Tailscale)
+
+Requirements: Docker with the compose plugin (your user in the `docker` group), `openssh-server`, `python3`.
+
+```sh
+git clone https://github.com/dromerCode/pocketpanel.git ~/pocketpanel
+cd ~/pocketpanel
+./install.sh                 # run as your normal user, not root
+```
+
+The installer builds the image, creates an SSH key that the panel uses to reach the host (restricted to
+`from="127.0.0.1"` in your `~/.ssh/authorized_keys`), writes `.env`, copies `config.yml` / `actions.yml` from
+the examples and prints your PIN.
+
+Then expose it to your tailnet with HTTPS (needed to install the app and for push notifications):
+
+```sh
+sudo tailscale serve --bg --https=8443 http://127.0.0.1:9300
+```
+
+and open `https://<server>.<your-tailnet>.ts.net:8443` on your phone → browser menu → *Install app*.
+
+### Configure
+
+Edit `config.yml` (every option is commented) and apply with:
+
+```sh
+docker compose up -d --force-recreate
+```
+
+If you enable `claude`, run `./install.sh` again so it mounts the Claude Code sessions. jfa-go credentials go in
+`.env` as `PANEL_JFA_USER=` / `PANEL_JFA_PASS=`. Change the PIN with `./install.sh NEWPIN`.
+Update with `git pull && ./install.sh`.
+
+### Backups as root (optional)
+
+By default backups and restores run as your user, so files only root can read are skipped (the panel tells
+you which ones) and those backups can't be restored. To copy everything:
+
+```sh
+sudo ./install-root.sh        # again after changing modules.backups; --remove to undo
+```
+
+It copies `backup.sh` / `restore.sh` to `/etc/pocketpanel` (owned by root, source and destination fixed from your
+config) and adds a sudoers rule that lets your user run **only those two scripts** as root.
+
+## Security notes
+
+- The backend binds to `127.0.0.1` with host networking: it is not reachable from your LAN, only through
+  `tailscale serve` (or a reverse proxy you set up yourself).
+- Anyone with the PIN gets a shell as your user and access to the Docker socket, which is root-equivalent.
+  Use a long PIN and keep it on your tailnet.
+- The panel's SSH key only works from `127.0.0.1`.
+
+## Development
+
+```sh
+python -m venv .venv && .venv/bin/pip install -r requirements.txt pytest pytest-asyncio
+.venv/bin/pytest
+```
+
+Backend in `app/` (`app/modules/` holds one file per optional module, registered only when enabled), frontend in
+`web/` (no build step).
+
+---
+
+## En español
+
+**pocketpanel** es una app para el móvil (PWA) con la que controlas tu servidor casero: estado, contenedores,
+terminal, avisos push y, si quieres, Claude Code, backups, RAID y usuarios de Jellyfin. Va en un solo contenedor,
+escucha solo en `127.0.0.1` y se abre desde el móvil por Tailscale.
+
+1. En el servidor (Ubuntu con Docker, tu usuario en el grupo `docker` y `openssh-server` instalado):
+   ```sh
+   git clone https://github.com/dromerCode/pocketpanel.git ~/pocketpanel && cd ~/pocketpanel && ./install.sh
+   ```
+   Apunta el PIN que te enseña al final.
+2. Publícalo en tu tailnet: `sudo tailscale serve --bg --https=8443 http://127.0.0.1:9300`.
+3. En el móvil abre `https://<servidor>.<tu-tailnet>.ts.net:8443` y usa "Instalar aplicación".
+4. Activa módulos en `config.yml` y aplica con `docker compose up -d --force-recreate`.
+
+Cambiar el PIN: `./install.sh NUEVOPIN`. Actualizar: `git pull && ./install.sh`.
+
+## License
+
+[MIT](LICENSE)

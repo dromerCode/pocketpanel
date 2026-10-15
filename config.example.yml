@@ -1,0 +1,55 @@
+# pocketpanel — configuración. Tras cambiarla: docker compose up -d --force-recreate
+# (si activas `claude`, vuelve a ejecutar ./install.sh para montar sus sesiones)
+
+name: mi-servidor              # título en la app y en los avisos
+timezone: Europe/Madrid        # para las tareas programadas
+disks: []                      # puntos de montaje a mostrar (admite *): ["/", "/mnt/*"]; vacío = discos reales
+disk_alert_percent: 90         # avisar cuando un disco pase de este %
+push_contact: mailto:admin@example.com   # contacto para las notificaciones push (lo pide el estándar)
+host_env: {}                   # variables extra para los comandos que se ejecutan en el host
+
+# Ajustes por contenedor (opcional): nombre bonito, puerto/URL del botón "Abrir", icono, ocultarlo
+services: {}
+#  jellyfin: {name: Jellyfin, port: 8096}
+#  nextcloud-db: {hidden: true}
+#  homeassistant: {name: Home Assistant, url: "https://ha.example.com", icon: "https://…/ha.png"}
+
+modules:
+  terminal:                    # terminal en el host por SSH (bash y tmux)
+    enabled: true
+  actions:                     # botones con comandos de actions.yml
+    enabled: true
+  updates:                     # buscar imágenes nuevas cada día y actualizar contenedores (con vuelta atrás)
+    enabled: true
+    check_at: "05:30"
+
+  claude:                      # chat con Claude Code en el host + informe diario por push
+    enabled: false             # necesita `claude` instalado y con sesión iniciada (CLAUDE_HOME en .env)
+    bin: ""                    # vacío = $CLAUDE_HOME/.local/bin/claude
+    report_at: "09:00"         # null = sin informe diario
+    report_notes: ""           # cosas que Claude debe saber al revisar ("el disco /mnt/viejo al 95% es normal")
+    diagnosis: ""              # prompt del botón Diagnóstico; vacío = uno genérico
+
+  backups:                     # copia incremental diaria (rsync + hardlinks) a otra máquina por SSH
+    enabled: false
+    source: /srv/appdata       # carpeta del host a copiar; cada subcarpeta se puede restaurar por separado
+    dest: usuario@nas:/backups/pocketpanel
+    ssh_key: ""                # clave para entrar en el destino (vacío = la que use tu usuario por defecto)
+    ssh_options: ""            # p. ej. "-p 2222"
+    at: "04:00"
+    keep_days: 7
+    excludes: [cache/, Cache/, logs/, log/, "*.log", transcodes/]
+
+  raid:                        # estado de un RAID mdadm (+ SMART si hay permisos)
+    enabled: false
+    device: /dev/md0
+    ssh: ""                    # vacío = en este servidor; o "root@nas" si el RAID está en otra máquina
+    ssh_options: ""
+    sudo: false                # en local: usar `sudo -n` para mdadm/smartctl (necesita regla en sudoers)
+
+  jellyfin:                    # cuentas e invitaciones de Jellyfin a través de jfa-go
+    enabled: false             # usuario/contraseña de jfa-go en .env: PANEL_JFA_USER / PANEL_JFA_PASS
+    jfa_url: http://127.0.0.1:8056
+    jellyfin_url: http://127.0.0.1:8096
+    public_url: ""             # web pública de jfa-go (enlaces de invitación)
+    db: ""                     # ruta a jellyfin.db para ver fechas de alta (opcional, necesita sqlite3)

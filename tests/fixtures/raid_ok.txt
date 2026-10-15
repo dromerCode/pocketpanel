@@ -1,0 +1,92 @@
+@mdstat
+Personalities : [raid0] [linear] [multipath] [raid1] [raid6] [raid5] [raid4] [raid10] 
+md0 : active raid5 sde[3] sdb[1] sda[0]
+      1953260544 blocks super 1.2 level 5, 512k chunk, algorithm 2 [3/3] [UUU]
+      bitmap: 0/8 pages [0KB], 65536KB chunk
+
+unused devices: <none>
+@detail
+/dev/md0:
+           Version : 1.2
+     Creation Time : Thu Sep 24 10:03:05 2026
+        Raid Level : raid5
+        Array Size : 1953260544 (1862.77 GiB 2000.14 GB)
+     Used Dev Size : 976630272 (931.39 GiB 1000.07 GB)
+      Raid Devices : 3
+     Total Devices : 3
+       Persistence : Superblock is persistent
+
+     Intent Bitmap : Internal
+
+       Update Time : Tue Oct 13 08:03:03 2026
+             State : clean 
+    Active Devices : 3
+   Working Devices : 3
+    Failed Devices : 0
+     Spare Devices : 0
+
+            Layout : left-symmetric
+        Chunk Size : 512K
+
+Consistency Policy : bitmap
+
+              Name : nas:0  (local to host nas)
+              UUID : e5f2b6da:77de9bc4:126f3fb9:8a4deb03
+            Events : 5098
+
+    Number   Major   Minor   RaidDevice State
+       0       8        0        0      active sync   /dev/sda
+       1       8       16        1      active sync   /dev/sdb
+       3       8       64        2      active sync   /dev/sde
+@smart /dev/sda
+smartctl 7.3 2022-02-28 r5338 [x86_64-linux-6.1.0-52-amd64] (local build)
+Copyright (C) 2002-22, Bruce Allen, Christian Franke, www.smartmontools.org
+
+=== START OF INFORMATION SECTION ===
+Model Family:     Seagate Samsung SpinPoint M8 (AF)
+Device Model:     ST1000LM024 HN-M101MBB
+Serial Number:    S31CJ9EF203387
+LU WWN Device Id: 5 0004cf 20c6c8ec8
+Firmware Version: 2BA30001
+User Capacity:    1.000.204.886.016 bytes [1,00 TB]
+Sector Sizes:     512 bytes logical, 4096 bytes physical
+Rotation Rate:    5400 rpm
+Form Factor:      2.5 inches
+Device is:        In smartctl database 7.3/6293
+ATA Version is:   ATA8-ACS T13/1699-D revision 6
+SATA Version is:  SATA 3.0, 6.0 Gb/s (current: 6.0 Gb/s)
+Local Time is:    Tue Oct 13 14:38:59 2026 CEST
+SMART support is: Available - device has SMART capability.
+SMART support is: Enabled
+
+=== START OF READ SMART DATA SECTION ===
+SMART overall-health self-assessment test result: PASSED
+
+SMART Attributes Data Structure revision number: 16
+Vendor Specific SMART Attributes with Thresholds:
+ID# ATTRIBUTE_NAME          FLAG     VALUE WORST THRESH TYPE      UPDATED  WHEN_FAILED RAW_VALUE
+  1 Raw_Read_Error_Rate     0x002f   100   100   051    Pre-fail  Always       -       37
+  2 Throughput_Performance  0x0026   252   252   000    Old_age   Always       -       0
+  3 Spin_Up_Time            0x0023   090   087   025    Pre-fail  Always       -       3161
+  4 Start_Stop_Count        0x0032   035   035   000    Old_age   Always       -       66068
+  5 Reallocated_Sector_Ct   0x0033   252   252   010    Pre-fail  Always       -       0
+  7 Seek_Error_Rate         0x002e   252   252   051    Old_age   Always       -       0
+  8 Seek_Time_Performance   0x0024   252   252   015    Old_age   Offline      -       0
+  9 Power_On_Hours          0x0032   100   100   000    Old_age   Always       -       17269
+ 10 Spin_Retry_Count        0x0032   252   252   051    Old_age   Always       -       0
+ 11 Calibration_Retry_Count 0x0032   100   100   000    Old_age   Always       -       50
+ 12 Power_Cycle_Count       0x0032   096   096   000    Old_age   Always       -       4493
+191 G-Sense_Error_Rate      0x0022   100   100   000    Old_age   Always       -       6
+192 Power-Off_Retract_Count 0x0022   252   252   000    Old_age   Always       -       0
+194 Temperature_Celsius     0x0002   063   046   000    Old_age   Always       -       37 (Min/Max 15/54)
+195 Hardware_ECC_Recovered  0x003a   100   100   000    Old_age   Always       -       0
+196 Reallocated_Event_Count 0x0032   252   252   000    Old_age   Always       -       0
+197 Current_Pending_Sector  0x0032   252   252   000    Old_age   Always       -       0
+198 Offline_Uncorrectable   0x0030   252   252   000    Old_age   Offline      -       0
+199 UDMA_CRC_Error_Count    0x0036   200   200   000    Old_age   Always       -       0
+200 Multi_Zone_Error_Rate   0x002a   100   100   000    Old_age   Always       -       22182
+223 Load_Retry_Count        0x0032   100   100   000    Old_age   Always       -       50
+225 Load_Cycle_Count        0x0032   024   024   000    Old_age   Always       -       773890
+
+@df
+/dev/md0       1967591211008 4319780864 1963254652928        1% /srv/raid

@@ -1,0 +1,9 @@
+fastapi==0.143.0
+uvicorn[standard]==0.54.0
+asyncssh==2.24.1
+httpx==0.28.1
+itsdangerous==2.2.0
+PyYAML==6.0.3
+pywebpush==2.5.0
+python-multipart==0.0.32
+tzdata==2026.1
