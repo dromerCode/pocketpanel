@@ -100,16 +100,55 @@ Backend in `app/` (`app/modules/` holds one file per optional module, registered
 terminal, avisos push y, si quieres, Claude Code, backups, RAID y usuarios de Jellyfin. Va en un solo contenedor,
 escucha solo en `127.0.0.1` y se abre desde el móvil por Tailscale.
 
-1. En el servidor (Ubuntu con Docker, tu usuario en el grupo `docker` y `openssh-server` instalado):
-   ```sh
-   git clone https://github.com/dromerCode/pocketpanel.git ~/pocketpanel && cd ~/pocketpanel && ./install.sh
-   ```
-   Apunta el PIN que te enseña al final.
-2. Publícalo en tu tailnet: `sudo tailscale serve --bg --https=8443 http://127.0.0.1:9300`.
-3. En el móvil abre `https://<servidor>.<tu-tailnet>.ts.net:8443` y usa "Instalar aplicación".
-4. Activa módulos en `config.yml` y aplica con `docker compose up -d --force-recreate`.
+### Instalación rápida
 
-Cambiar el PIN: `./install.sh NUEVOPIN`. Actualizar: `git pull && ./install.sh`.
+**Antes de empezar**, en el servidor necesitas:
+
+```sh
+sudo apt install openssh-server tmux rsync     # rsync solo si vas a usar backups
+sudo usermod -aG docker $USER                  # y cierra sesión y vuelve a entrar
+```
+
+(Docker con el plugin de compose y Tailscale ya instalados y con sesión iniciada.)
+
+**1. Instalar** (como tu usuario, no con sudo):
+
+```sh
+git clone https://github.com/dromerCode/pocketpanel.git ~/pocketpanel
+cd ~/pocketpanel
+./install.sh
+```
+
+Te pregunta si vas a usar Claude Code (si no lo tienes, di que no) y al final te enseña el **PIN**: apúntalo.
+
+**2. Abrirlo desde el móvil por Tailscale:**
+
+```sh
+sudo tailscale serve --bg --https=8443 http://127.0.0.1:9300
+```
+
+En el móvil (conectado a tu tailnet) entra en `https://<nombre-del-servidor>.<tu-tailnet>.ts.net:8443`
+(el nombre exacto sale con `tailscale status` o en el panel de Tailscale), mete el PIN y en el menú del
+navegador dale a **"Instalar aplicación"** / "Añadir a pantalla de inicio". En Estado, la campanita 🔕 activa
+los avisos push.
+
+**3. Configurarlo a tu gusto** (opcional): edita `~/pocketpanel/config.yml` (está todo comentado: nombre del
+servidor, discos a mostrar, botones de "Abrir" de cada contenedor y los módulos extra: backups, RAID, Claude,
+Jellyfin) y aplica con:
+
+```sh
+docker compose up -d --force-recreate
+```
+
+Los botones de acciones rápidas se editan en `actions.yml` (se recargan solos).
+
+**Otras cosas:**
+
+- Cambiar el PIN: `./install.sh NUEVOPIN`
+- Actualizar a la última versión: `git pull && ./install.sh`
+- Si algo no va: `docker logs pocketpanel`
+- Ojo: con el PIN se puede usar la terminal y Docker de tu servidor. No lo compartas y no lo expongas fuera de
+  Tailscale.
 
 ## License
 
