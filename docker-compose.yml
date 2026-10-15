@@ -15,10 +15,9 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./ssh:/ssh:ro
-      - ./config.yml:/config/config.yml:ro
+      - ./config.yml:/config/config.yml   # con escritura: la app lo edita desde Módulos
       - ./actions.yml:/config/actions.yml:ro
       - ./data:/data
       - ./uploads:/uploads
-      - ${CLAUDE_SESSIONS:-./empty}:/sessions:ro
     labels:
       icon: https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@master/png/glances.png

@@ -7,7 +7,6 @@ cd "$(dirname "$0")"
 
 die() { echo "✗ $*" >&2; exit 1; }
 warn() { echo "⚠ $*" >&2; }
-ask() { local a; read -rp "$1 [$2]: " a </dev/tty; echo "${a:-$2}"; }
 # Lee una variable del .env (vacío si no está)
 getv() { grep -s "^$1=" .env | head -1 | cut -d= -f2- || true; }
 # Escribe una variable en el .env conservando el resto
@@ -26,8 +25,7 @@ HOSTKEY=/etc/ssh/ssh_host_ed25519_key.pub
 for t in tmux rsync sqlite3; do command -v "$t" >/dev/null || warn "no está '$t' (lo usan algunos módulos: sudo apt install $t)"; done
 
 umask 077
-mkdir -p ssh data uploads empty
-chmod 755 empty
+mkdir -p ssh data uploads
 
 # --- clave SSH del panel para entrar en este host (solo desde 127.0.0.1) ---
 [ -f ssh/id_ed25519 ] || ssh-keygen -q -t ed25519 -N "" -C pocketpanel -f ssh/id_ed25519
@@ -52,21 +50,6 @@ setv PANEL_HOST_DIR "$(pwd)"
 [ -n "$(getv PANEL_PORT)" ] || setv PANEL_PORT 9300
 [ -n "$(getv TZ)" ] || setv TZ "$(timedatectl show -p Timezone --value 2>/dev/null || echo Europe/Madrid)"
 
-if [ -z "$(getv CLAUDE_HOME)" ] && [ -z "$(getv CLAUDE_ASKED)" ]; then
-  if [ "$(ask '¿Vas a usar el módulo de Claude Code? (s/n)' n)" = s ]; then
-    setv CLAUDE_HOME "$(ask 'HOME con el que usas claude' "$HOME")"
-    setv CLAUDE_CWD "$(ask 'Carpeta donde trabaja Claude' "$(getv CLAUDE_HOME)")"
-  fi
-  setv CLAUDE_ASKED 1
-fi
-if [ -n "$(getv CLAUDE_HOME)" ]; then
-  # Claude Code guarda las sesiones en ~/.claude/projects/<carpeta con todo lo que no es letra o número → ->
-  proj=$(getv CLAUDE_CWD | sed 's/[^A-Za-z0-9]/-/g')
-  sessions="$(getv CLAUDE_HOME)/.claude/projects/$proj"
-  mkdir -p "$sessions"
-  setv CLAUDE_SESSIONS "$sessions"
-fi
-
 pin="${1:-}"
 if [ -n "$pin" ] || [ -z "$(getv PANEL_PIN_HASH)" ]; then
   [ -n "$pin" ] || pin=$(python3 -c 'import secrets;print(f"{secrets.randbelow(10**6):06d}")')
@@ -80,7 +63,7 @@ print("scrypt:"+base64.b64encode(s).decode()+":"+base64.b64encode(dk).decode())'
 fi
 
 umask 022
-[ -f config.yml ] || { cp config.example.yml config.yml; echo "✓ config.yml creado: edítalo para activar módulos"; }
+[ -f config.yml ] || { cp config.example.yml config.yml; echo "✓ config.yml creado (los módulos se activan desde la app: Estado → ⚙)"; }
 [ -f actions.yml ] || cp actions.example.yml actions.yml
 
 docker compose up -d --build --force-recreate

@@ -18,16 +18,16 @@ def setup(ctx) -> APIRouter:
             return
         await ws.accept()
         try:
-            if mode != "shell" and not cfg.enabled("claude"):
+            if mode == "shell":
+                cmd = term_command(mode, session, "", "", "")
+            elif ctx.claude_paths:
+                p = await ctx.claude_paths.resolve()
+                cmd = term_command(mode, session, p["home"], p["cwd"], p["bin"])
+            else:
                 raise ValueError("modo no válido")
-            cmd = term_command(mode, session, cfg.claude_home, cfg.claude_cwd, claude_bin(cfg))
             await bridge(ws, ctx.ssh, cmd, cols, rows)
         except (ValueError, SSHError) as e:
             await ws.send_text(json.dumps({"error": str(e)}))
             await ws.close()
 
     return r
-
-
-def claude_bin(cfg) -> str:
-    return cfg.mod("claude")["bin"] or f"{cfg.claude_home}/.local/bin/claude"

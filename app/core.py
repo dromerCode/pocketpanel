@@ -21,6 +21,7 @@ class Context:
     raid: object = None
     claude: object = None
     restorer: object = None
+    claude_paths: object = None
 
     def busy(self) -> str | None:
         """Algo que un reinicio cortaría a medias (para no guardar ajustes mientras tanto)."""

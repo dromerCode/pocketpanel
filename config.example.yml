@@ -1,5 +1,5 @@
-# pocketpanel — configuración. Tras cambiarla: docker compose up -d --force-recreate
-# (si activas `claude`, vuelve a ejecutar ./install.sh para montar sus sesiones)
+# pocketpanel — configuración. Lo normal es cambiarla desde la app (Estado → ⚙ Módulos), que la reescribe
+# conservando estos comentarios. Si la editas a mano, aplica con: docker compose up -d --force-recreate
 
 name: mi-servidor              # título en la app y en los avisos
 timezone: Europe/Madrid        # para las tareas programadas
@@ -24,8 +24,10 @@ modules:
     check_at: "05:30"
 
   claude:                      # chat con Claude Code en el host + informe diario por push
-    enabled: false             # necesita `claude` instalado y con sesión iniciada (CLAUDE_HOME en .env)
-    bin: ""                    # vacío = $CLAUDE_HOME/.local/bin/claude
+    enabled: false             # necesita `claude` instalado y con sesión iniciada en el servidor
+    home: ""                   # HOME con el que usas claude; vacío = el de tu usuario
+    cwd: ""                    # carpeta donde trabaja; vacío = igual que home
+    bin: ""                    # vacío = <home>/.local/bin/claude
     permission_mode: ""        # el chat no puede preguntarte: para que ejecute comandos pon "auto" o "bypassPermissions"
                                # (vacío = lo que diga tu configuración de Claude Code)
     report_at: "09:00"         # null = sin informe diario
@@ -50,7 +52,7 @@ modules:
     sudo: false                # en local: usar `sudo -n` para mdadm/smartctl (necesita regla en sudoers)
 
   jellyfin:                    # cuentas e invitaciones de Jellyfin a través de jfa-go
-    enabled: false             # usuario/contraseña de jfa-go en .env: PANEL_JFA_USER / PANEL_JFA_PASS
+    enabled: false             # usuario/contraseña de jfa-go: desde la app (se guardan aparte, en data/)
     jfa_url: http://127.0.0.1:8056
     jellyfin_url: http://127.0.0.1:8096
     public_url: ""             # web pública de jfa-go (enlaces de invitación)

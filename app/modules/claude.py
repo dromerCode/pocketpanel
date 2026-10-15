@@ -4,12 +4,11 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 
 from .. import auth
-from ..claude import ClaudeManager, SessionStore
+from ..claude import ClaudeManager, ClaudePaths, SessionStore, SftpFS
 from ..monitor import due_daily
 from ..report import Report
 from ..ssh import RemoteClaude
 from ..uploads import MAX_BYTES, clean_old, safe_name
-from .terminal import claude_bin
 
 DIAGNOSIS = """Diagnóstico completo del servidor
 
@@ -44,9 +43,14 @@ class ClaudeHook:
 def setup(ctx) -> APIRouter:
     cfg, m = ctx.cfg, ctx.cfg.mod("claude")
     Path(cfg.uploads_dir).mkdir(parents=True, exist_ok=True)
-    store = SessionStore(cfg.sessions_dir)
-    claude = ctx.claude = ClaudeManager(lambda cmd: RemoteClaude.spawn(ctx.ssh, cmd), cfg.claude_home,
-                                        cfg.claude_cwd, claude_bin(cfg), m["permission_mode"])
+    paths = ctx.claude_paths = ClaudePaths(ctx.ssh, m, env_home=cfg.claude_home, env_cwd=cfg.claude_cwd)
+
+    async def sessions_dir():
+        return (await paths.resolve())["sessions"]
+
+    store = SessionStore(SftpFS(ctx.ssh), sessions_dir)
+    claude = ctx.claude = ClaudeManager(lambda cmd: RemoteClaude.spawn(ctx.ssh, cmd),
+                                        permission_mode=m["permission_mode"], paths=paths)
     report = Report(ctx, claude, notes=m["report_notes"])
     ctx.hooks.append(ClaudeHook(ctx, report, cfg.uploads_dir))
     ctx.info["claude"] = {"diagnosis": m["diagnosis"] or DIAGNOSIS, "report": bool(m["report_at"])}
@@ -89,13 +93,13 @@ def setup(ctx) -> APIRouter:
 
     @r.get("/api/claude/sessions", dependencies=authed)
     async def sessions():
-        return store.list()
+        return await store.list()
 
     @r.get("/api/claude/sessions/{sid}", dependencies=authed)
     async def session(sid: str):
         # Si hay un turno en marcha en esta sesión, sus mensajes llegan por el WS: no los dupliquemos.
         before = claude.started_at if claude.running and claude.session == sid else None
-        res = store.read(sid, before=before)
+        res = await store.read(sid, before=before)
         if res is None:
             raise HTTPException(404, "no existe")
         return res

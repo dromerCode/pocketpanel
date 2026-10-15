@@ -58,7 +58,6 @@ class Config:
     known_hosts: str = "/ssh/known_hosts"
     docker_sock: str = "/var/run/docker.sock"
     web_dir: str = ""
-    sessions_dir: str = "/sessions"
     data_dir: str = "/data"
     uploads_dir: str = "/uploads"
     actions_file: str = "/config/actions.yml"
@@ -165,7 +164,6 @@ def load_config(path: str | None = None, env: Mapping | None = None) -> Config:
         known_hosts=e("PANEL_KNOWN_HOSTS", "/ssh/known_hosts"),
         docker_sock=e("PANEL_DOCKER_SOCK", "/var/run/docker.sock"),
         web_dir=e("PANEL_WEB", str(root / "web")),
-        sessions_dir=e("PANEL_SESSIONS", "/sessions"),
         data_dir=data_dir,
         uploads_dir=e("PANEL_UPLOADS", "/uploads"),
         actions_file=e("PANEL_ACTIONS", "/config/actions.yml"),

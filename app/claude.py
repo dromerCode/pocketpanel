@@ -125,9 +125,9 @@ def build_cmd(text: str, session: str | None, home: str, cwd: str, bin: str = ""
 class ClaudeManager:
     """Un turno de Claude a la vez; guarda los eventos del turno para quien se conecte tarde."""
 
-    def __init__(self, spawn, home: str, cwd: str, bin: str = "", permission_mode: str = ""):
+    def __init__(self, spawn, home: str = "", cwd: str = "", bin: str = "", permission_mode: str = "", paths=None):
         self.spawn, self.home, self.cwd, self.bin = spawn, home, cwd, bin
-        self.permission_mode = permission_mode
+        self.permission_mode, self.paths = permission_mode, paths
         self.events: list = []
         self.subs: set[asyncio.Queue] = set()
         self.running = False
@@ -165,6 +165,9 @@ class ClaudeManager:
     async def send(self, text: str, session: str | None) -> None:
         if self.running:
             raise RuntimeError("ya hay un turno en marcha")
+        if self.paths:  # rutas resueltas en el host (HOME del usuario si la config no dice otra cosa)
+            r = await self.paths.resolve()
+            self.home, self.cwd, self.bin = r["home"], r["cwd"], r["bin"]
         cmd = build_cmd(text, session, self.home, self.cwd, self.bin, self.permission_mode)
         self.running = True
         self.session = session
@@ -236,39 +239,89 @@ class ClaudeManager:
             await self.proc.stop()
 
 
+class ClaudePaths:
+    """Dónde está Claude en el host. Vacío en la config = HOME del usuario del host (se pregunta por SSH una vez)."""
+
+    def __init__(self, ssh, opts: dict, env_home: str = "", env_cwd: str = ""):
+        self.ssh, self.opts, self.env_home, self.env_cwd = ssh, opts, env_home, env_cwd
+        self._r: dict | None = None
+
+    async def resolve(self) -> dict:
+        if self._r is None:
+            home = self.opts.get("home") or self.env_home
+            if not home:
+                home = (await self.ssh.run('printf %s "$HOME"')).strip()
+            cwd = self.opts.get("cwd") or self.env_cwd or home
+            self._r = {"home": home, "cwd": cwd, "bin": self.opts.get("bin") or f"{home}/.local/bin/claude",
+                       # Claude Code guarda las sesiones en projects/<carpeta con lo que no es letra o número → ->
+                       "sessions": f"{home}/.claude/projects/{re.sub(r'[^A-Za-z0-9]', '-', cwd)}"}
+        return self._r
+
+
+def _missing(e: Exception) -> bool:
+    from asyncssh import SFTPNoSuchFile
+    return isinstance(e, (FileNotFoundError, SFTPNoSuchFile))
+
+
+class LocalFS:
+    async def listdir(self, folder: str) -> list:
+        return [(p.name, p.stat().st_mtime, p.stat().st_size) for p in Path(folder).iterdir()]
+
+    async def read_text(self, path: str) -> str:
+        return Path(path).read_text(encoding="utf-8", errors="replace")
+
+
+class SftpFS:
+    """Los ficheros del host por SFTP, sobre la misma conexión SSH del panel."""
+
+    def __init__(self, ssh):
+        self.ssh = ssh
+
+    async def listdir(self, folder: str) -> list:
+        async with (await self.ssh.conn()).start_sftp_client() as sftp:
+            return [(n.filename, n.attrs.mtime or 0, n.attrs.size or 0) for n in await sftp.readdir(folder)]
+
+    async def read_text(self, path: str) -> str:
+        async with (await self.ssh.conn()).start_sftp_client() as sftp:
+            async with sftp.open(path, "rb") as f:
+                return (await f.read()).decode("utf-8", errors="replace")
+
+
 class SessionStore:
     """Lee las conversaciones guardadas por Claude (.jsonl), con caché por mtime/tamaño."""
 
-    def __init__(self, folder: str):
-        self.folder = Path(folder)
+    def __init__(self, fs, folder):
+        self.fs, self.folder = fs, folder  # folder: corrutina que devuelve la carpeta
         self._titles: dict[str, tuple] = {}
 
-    def list(self, limit: int = 60) -> list:
-        if not self.folder.is_dir():
-            return []
-        files = sorted(self.folder.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+    async def list(self, limit: int = 60) -> list:
+        d = await self.folder()
+        try:
+            entries = await self.fs.listdir(d)
+        except Exception as e:  # noqa: BLE001
+            if _missing(e):  # aún no hay sesiones en esa carpeta
+                return []
+            raise
+        files = sorted((e for e in entries if e[0].endswith(".jsonl") and e[2] > 0), key=lambda e: e[1], reverse=True)
         out = []
-        for p in files:
-            st = p.stat()
-            if st.st_size == 0:
-                continue
-            key = (st.st_mtime, st.st_size)
-            cached = self._titles.get(p.stem)
-            if not cached or cached[0] != key:
-                with p.open(encoding="utf-8", errors="replace") as f:
-                    info = parse_session_file(f, messages=False)
-                cached = (key, info["title"])
-                self._titles[p.stem] = cached
-            out.append({"id": p.stem, "title": cached[1], "updated": int(st.st_mtime)})
-            if len(out) >= limit:
-                break
+        for name, mtime, size in files[:limit]:
+            sid = name[:-len(".jsonl")]
+            cached = self._titles.get(sid)
+            if not cached or cached[0] != (mtime, size):
+                text = await self.fs.read_text(f"{d}/{name}")
+                cached = ((mtime, size), parse_session_file(text.splitlines(), messages=False)["title"])
+                self._titles[sid] = cached
+            out.append({"id": sid, "title": cached[1], "updated": int(mtime)})
         return out
 
-    def read(self, sid: str, before: str | None = None) -> dict | None:
+    async def read(self, sid: str, before: str | None = None) -> dict | None:
         if not UUID_RE.match(sid):
             return None
-        p = self.folder / f"{sid}.jsonl"
-        if not p.exists():
-            return None
-        with p.open(encoding="utf-8", errors="replace") as f:
-            return parse_session_file(f, before=before)
+        d = await self.folder()
+        try:
+            text = await self.fs.read_text(f"{d}/{sid}.jsonl")
+        except Exception as e:  # noqa: BLE001
+            if _missing(e):
+                return None
+            raise
+        return parse_session_file(text.splitlines(), before=before)
