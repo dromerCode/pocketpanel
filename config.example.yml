@@ -26,6 +26,8 @@ modules:
   claude:                      # chat con Claude Code en el host + informe diario por push
     enabled: false             # necesita `claude` instalado y con sesión iniciada (CLAUDE_HOME en .env)
     bin: ""                    # vacío = $CLAUDE_HOME/.local/bin/claude
+    permission_mode: ""        # el chat no puede preguntarte: para que ejecute comandos pon "auto" o "bypassPermissions"
+                               # (vacío = lo que diga tu configuración de Claude Code)
     report_at: "09:00"         # null = sin informe diario
     report_notes: ""           # cosas que Claude debe saber al revisar ("el disco /mnt/viejo al 95% es normal")
     diagnosis: ""              # prompt del botón Diagnóstico; vacío = uno genérico

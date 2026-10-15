@@ -95,3 +95,10 @@ def test_example_config_valid_with_every_module_enabled(tmp_path):
     p.write_text(yaml.safe_dump(raw))
     c = load_config(str(p), {})
     assert list(c.modules) == ["terminal", "actions", "updates", "claude", "backups", "raid", "jellyfin"]
+
+
+def test_claude_permission_mode_validated(tmp_path):
+    c = cfg(tmp_path, "modules:\n  claude: {enabled: true, permission_mode: auto}\n")
+    assert c.mod("claude")["permission_mode"] == "auto"
+    with pytest.raises(ConfigError, match="modules.claude.permission_mode"):
+        cfg(tmp_path, "modules:\n  claude: {enabled: true, permission_mode: yolo}\n")

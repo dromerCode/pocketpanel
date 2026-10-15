@@ -142,6 +142,19 @@ docker compose up -d --force-recreate
 
 Los botones de acciones rápidas se editan en `actions.yml` (se recargan solos).
 
+**Con Claude Code** (si ya lo tienes instalado y con sesión iniciada en el servidor): en `./install.sh` contesta
+`s` a la pregunta de Claude (el HOME y la carpeta de trabajo por defecto suelen valer) y en `config.yml` pon:
+
+```yaml
+  claude:
+    enabled: true
+    permission_mode: auto        # o bypassPermissions; si no, el chat no puede ejecutar comandos
+```
+
+Aplica con `docker compose up -d --force-recreate`. Aparece la pestaña Claude (chat con adjuntos, botón de
+diagnóstico y resumen diario por push a las 09:00) y el modo "tmux claude" en la terminal. Si instalaste `claude`
+con npm en vez del instalador oficial, pon su ruta en `bin:` (la ves con `which claude`).
+
 **Otras cosas:**
 
 - Cambiar el PIN: `./install.sh NUEVOPIN`

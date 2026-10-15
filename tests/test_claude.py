@@ -215,3 +215,10 @@ def test_term_tmux_runs_configured_bin():
     from app.terminal import term_command
     cmd = term_command("tmux", None, "/home/u", "/srv", "/opt/claude")
     assert "/opt/claude" in cmd and "HOME=/home/u" in cmd
+
+
+def test_build_cmd_permission_mode():
+    cmd = build_cmd("x", None, home="/h", cwd="/c", permission_mode="bypassPermissions")
+    args = shlex.split(cmd.split("exec ", 1)[1])
+    assert args[args.index("--permission-mode") + 1] == "bypassPermissions"
+    assert "--permission-mode" not in build_cmd("x", None, home="/h", cwd="/c")

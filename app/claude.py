@@ -108,9 +108,11 @@ def parse_session_file(lines, before: str | None = None, messages: bool = True) 
     return {"title": title or "(sin título)", "messages": msgs}
 
 
-def build_cmd(text: str, session: str | None, home: str, cwd: str, bin: str = "") -> str:
+def build_cmd(text: str, session: str | None, home: str, cwd: str, bin: str = "", permission_mode: str = "") -> str:
     args = [bin or f"{home}/.local/bin/claude", "-p", text, "--output-format", "stream-json",
             "--verbose", "--include-partial-messages"]
+    if permission_mode:
+        args += ["--permission-mode", permission_mode]
     if session:
         if not UUID_RE.match(session):
             raise ValueError("id de sesión no válido")
@@ -123,8 +125,9 @@ def build_cmd(text: str, session: str | None, home: str, cwd: str, bin: str = ""
 class ClaudeManager:
     """Un turno de Claude a la vez; guarda los eventos del turno para quien se conecte tarde."""
 
-    def __init__(self, spawn, home: str, cwd: str, bin: str = ""):
+    def __init__(self, spawn, home: str, cwd: str, bin: str = "", permission_mode: str = ""):
         self.spawn, self.home, self.cwd, self.bin = spawn, home, cwd, bin
+        self.permission_mode = permission_mode
         self.events: list = []
         self.subs: set[asyncio.Queue] = set()
         self.running = False
@@ -162,7 +165,7 @@ class ClaudeManager:
     async def send(self, text: str, session: str | None) -> None:
         if self.running:
             raise RuntimeError("ya hay un turno en marcha")
-        cmd = build_cmd(text, session, self.home, self.cwd, self.bin)
+        cmd = build_cmd(text, session, self.home, self.cwd, self.bin, self.permission_mode)
         self.running = True
         self.session = session
         self.started_at = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime())

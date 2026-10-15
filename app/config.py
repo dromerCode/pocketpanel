@@ -20,7 +20,7 @@ MODULE_DEFAULTS: dict[str, dict] = {
     "terminal": {"enabled": True},
     "actions": {"enabled": True},
     "updates": {"enabled": True, "check_at": "05:30"},
-    "claude": {"enabled": False, "bin": "", "report_at": "09:00", "report_notes": "", "diagnosis": ""},
+    "claude": {"enabled": False, "bin": "", "permission_mode": "", "report_at": "09:00", "report_notes": "", "diagnosis": ""},
     "backups": {"enabled": False, "source": "", "dest": "", "ssh_key": "", "ssh_options": "", "at": "04:00", "keep_days": 7,
                 "excludes": ["cache/", "Cache/", "logs/", "log/", "*.log", "transcodes/"]},
     "raid": {"enabled": False, "device": "/dev/md0", "ssh": "", "ssh_options": "", "sudo": False},
@@ -29,6 +29,7 @@ MODULE_DEFAULTS: dict[str, dict] = {
 }
 TIME_KEYS = {("updates", "check_at"), ("claude", "report_at"), ("backups", "at")}
 REQUIRED = {"backups": ("source", "dest")}
+CHOICES = {("claude", "permission_mode"): ("", "default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions")}
 
 TOP_DEFAULTS = {"name": "servidor", "timezone": "Europe/Madrid", "disks": [], "disk_alert_percent": 90,
                 "host_env": {}, "push_contact": "mailto:admin@example.com", "services": {}}
@@ -100,6 +101,8 @@ def _modules(raw) -> dict:
                     continue
                 if not isinstance(v, str) or not TIME_RE.match(v):
                     raise ConfigError(f"modules.{name}.{k}: hora no válida (formato HH:MM)")
+            elif (name, k) in CHOICES and v not in CHOICES[(name, k)]:
+                raise ConfigError(f"modules.{name}.{k}: tiene que ser uno de {', '.join(c for c in CHOICES[(name, k)] if c)}")
             elif type(d) is not type(v):
                 raise ConfigError(f"modules.{name}.{k}: tipo no válido (se esperaba {type(d).__name__})")
         for k in REQUIRED.get(name, ()):

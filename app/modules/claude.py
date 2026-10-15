@@ -46,7 +46,7 @@ def setup(ctx) -> APIRouter:
     Path(cfg.uploads_dir).mkdir(parents=True, exist_ok=True)
     store = SessionStore(cfg.sessions_dir)
     claude = ctx.claude = ClaudeManager(lambda cmd: RemoteClaude.spawn(ctx.ssh, cmd), cfg.claude_home,
-                                        cfg.claude_cwd, claude_bin(cfg))
+                                        cfg.claude_cwd, claude_bin(cfg), m["permission_mode"])
     report = Report(ctx, claude, notes=m["report_notes"])
     ctx.hooks.append(ClaudeHook(ctx, report, cfg.uploads_dir))
     ctx.info["claude"] = {"diagnosis": m["diagnosis"] or DIAGNOSIS, "report": bool(m["report_at"])}
