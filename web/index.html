@@ -30,6 +30,7 @@
         <h1 class="srv-name">servidor</h1>
         <span id="st-uptime" class="muted mono small"></span>
         <button id="push-btn" class="icon-btn" title="Avisos" aria-label="Avisos">🔕</button>
+        <a href="#modules" class="icon-btn" title="Módulos y ajustes" aria-label="Módulos y ajustes">⚙</a>
       </header>
       <div class="scroll pad">
         <div class="cards">
@@ -75,6 +76,20 @@
           <h2 class="section-title">Acciones rápidas</h2>
           <div id="actions" class="actions"></div>
         </div>
+      </div>
+    </section>
+
+    <!-- Módulos -->
+    <section id="view-modules" class="view" data-view="modules" hidden>
+      <header class="topbar">
+        <a href="#status" class="icon-btn" aria-label="Volver">←</a>
+        <h1>Módulos</h1>
+      </header>
+      <div class="scroll pad">
+        <p class="muted small">Activa lo que uses. Al guardar, el panel se reinicia en un par de segundos.</p>
+        <div id="mod-general"></div>
+        <h2 class="section-title">Módulos</h2>
+        <div id="mod-grid" class="mod-grid"></div>
       </div>
     </section>
 
@@ -214,6 +229,25 @@
       </header>
       <div id="us-body" class="us-body scroll"></div>
     </div>
+  </div>
+
+  <!-- Ficha de un módulo -->
+  <div id="msheet" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="ms-title">
+      <header class="sheet-head">
+        <span id="ms-icon" class="mod-icon"></span>
+        <div class="sheet-titles">
+          <h2 id="ms-title"></h2>
+          <span id="ms-sub" class="muted small"></span>
+        </div>
+        <button id="ms-close" class="icon-btn" aria-label="Cerrar">✕</button>
+      </header>
+      <div id="ms-body" class="us-body scroll"></div>
+    </div>
+  </div>
+
+  <div id="restarting" class="restarting" hidden>
+    <div class="restarting-box"><span class="spinner"></span><span id="restarting-text">Reiniciando el panel…</span></div>
   </div>
 
   <!-- Salida de una acción rápida -->

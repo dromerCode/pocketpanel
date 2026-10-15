@@ -1,0 +1,61 @@
+- generic [active] [ref=e1]:
+  - main [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - heading "mi-servidor" [level=1] [ref=e11]
+        - button "Avisos" [ref=e12] [cursor=pointer]: 🔕
+        - link "Módulos y ajustes" [ref=e13] [cursor=pointer]:
+          - /url: "#modules"
+          - text: ⚙
+      - generic [ref=e14]:
+        - generic [ref=e15]:
+          - generic [ref=e16]:
+            - generic [ref=e17]: CPU
+            - generic [ref=e18]: –
+          - generic [ref=e19]:
+            - generic [ref=e20]: RAM
+            - generic [ref=e21]: –
+          - generic [ref=e22]:
+            - generic [ref=e23]: Temperatura
+            - generic [ref=e24]: –
+            - generic [ref=e25]: CPU
+          - link "Contenedores –" [ref=e26] [cursor=pointer]:
+            - /url: "#services"
+            - generic [ref=e27]: Contenedores
+            - generic [ref=e28]: –
+        - generic [ref=e29]:
+          - heading "Historial" [level=2] [ref=e30]
+          - generic [ref=e31]:
+            - button "1 h" [ref=e32] [cursor=pointer]
+            - button "24 h" [ref=e33] [cursor=pointer]
+            - button "7 d" [ref=e34] [cursor=pointer]
+        - generic [ref=e35]:
+          - generic [ref=e36]:
+            - generic [ref=e37]: CPU
+            - generic [ref=e39]: Recogiendo datos… (una muestra cada 30 s)
+          - generic [ref=e40]:
+            - generic [ref=e41]: RAM
+            - generic [ref=e43]: Recogiendo datos… (una muestra cada 30 s)
+          - generic [ref=e44]:
+            - generic [ref=e45]: Temperatura
+            - generic [ref=e47]: Recogiendo datos… (una muestra cada 30 s)
+        - generic [ref=e49]:
+          - heading "Discos" [level=2] [ref=e50]
+          - list
+        - generic [ref=e51]:
+          - heading "Acciones rápidas" [level=2] [ref=e52]
+          - paragraph [ref=e54]: No hay acciones en actions.yml
+    - navigation [ref=e55]:
+      - link "◉ Estado" [ref=e56] [cursor=pointer]:
+        - /url: "#status"
+        - generic [ref=e57]: ◉
+        - text: Estado
+      - link "▤ Servicios" [ref=e58] [cursor=pointer]:
+        - /url: "#services"
+        - generic [ref=e59]: ▤
+        - text: Servicios
+      - link "›_ Terminal" [ref=e60] [cursor=pointer]:
+        - /url: "#terminal"
+        - generic [ref=e61]: ›_
+        - text: Terminal
+  - generic [ref=e62]: "Estado: no conecta por SSH: [Errno 2] No such file or directory: '/ssh/id_ed25519'"
