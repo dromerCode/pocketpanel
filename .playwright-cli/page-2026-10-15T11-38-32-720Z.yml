@@ -1,0 +1,137 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "homelab" [level=1] [ref=e5]
+      - generic [ref=e6]: encendido 6d 7h
+      - button "Avisos" [ref=e7] [cursor=pointer]: 🔕
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - generic [ref=e10]:
+          - generic [ref=e11]: CPU
+          - generic [ref=e12]: 18%
+          - generic [ref=e13]: carga 0.82 0.71 0.66
+        - generic [ref=e14]:
+          - generic [ref=e15]: RAM
+          - generic [ref=e16]: 56%
+          - generic [ref=e17]: 16.7 GB / 29.8 GB
+        - generic [ref=e18]:
+          - generic [ref=e19]: Temperatura
+          - generic [ref=e20]: 47°
+          - generic [ref=e21]: CPU
+        - link "Contenedores 14 1 caído" [ref=e22] [cursor=pointer]:
+          - /url: "#services/down"
+          - generic [ref=e23]: Contenedores
+          - generic [ref=e24]: "14"
+          - generic [ref=e25]: 1 caído
+      - generic [ref=e26]:
+        - heading "Historial" [level=2] [ref=e27]
+        - generic [ref=e28]:
+          - button "1 h" [ref=e29] [cursor=pointer]
+          - button "24 h" [ref=e30] [cursor=pointer]
+          - button "7 d" [ref=e31] [cursor=pointer]
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - generic [ref=e34]:
+            - generic [ref=e35]: CPU
+            - generic [ref=e36]: ahora 15% · máx 54%
+          - 'img "CPU: ahora 15%, máximo 54%" [ref=e37]':
+            - generic [ref=e38]: "0"
+            - generic [ref=e39]: "50"
+            - generic [ref=e40]: "100"
+            - generic [ref=e41]: 12:38
+            - generic [ref=e42]: 13:38
+        - generic [ref=e45]:
+          - generic [ref=e46]:
+            - generic [ref=e47]: RAM
+            - generic [ref=e48]: ahora 56% · máx 58%
+          - 'img "RAM: ahora 56%, máximo 58%" [ref=e49]':
+            - generic [ref=e50]: "0"
+            - generic [ref=e51]: "50"
+            - generic [ref=e52]: "100"
+            - generic [ref=e53]: 12:38
+            - generic [ref=e54]: 13:38
+        - generic [ref=e57]:
+          - generic [ref=e58]:
+            - generic [ref=e59]: Temperatura
+            - generic [ref=e60]: ahora 46° · máx 51°
+          - 'img "Temperatura: ahora 46°, máximo 51°" [ref=e61]':
+            - generic [ref=e62]: "35"
+            - generic [ref=e63]: "45"
+            - generic [ref=e64]: "55"
+            - generic [ref=e65]: 12:38
+            - generic [ref=e66]: 13:38
+      - generic [ref=e69]:
+        - generic [ref=e70]:
+          - generic [ref=e71]:
+            - generic [ref=e72]:
+              - heading "RAID" [level=2] [ref=e73]
+              - generic [ref=e74]: Limpio
+            - generic [ref=e75]:
+              - generic [ref=e77]:
+                - generic [ref=e78]: RAID5 · 3 discos
+                - generic [ref=e79]: 2.2 TB libres · 70%
+              - list [ref=e82]:
+                - listitem [ref=e83]:
+                  - generic [ref=e84]: sda
+                  - generic [ref=e85]: WDC WD40EFRX
+                  - generic [ref=e86]: ✓ SMART
+                  - generic [ref=e87]: active sync · 34° · 895 días encendido
+                - listitem [ref=e88]:
+                  - generic [ref=e89]: sdb
+                  - generic [ref=e90]: WDC WD40EFRX
+                  - generic [ref=e91]: ✓ SMART
+                  - generic [ref=e92]: active sync · 35° · 895 días encendido
+                - listitem [ref=e93]:
+                  - generic [ref=e94]: sdc
+                  - generic [ref=e95]: ST4000VN008
+                  - generic [ref=e96]: ✓ SMART
+                  - generic [ref=e97]: active sync · 37° · 388 días encendido
+          - generic [ref=e98]:
+            - generic [ref=e99]:
+              - heading "Backups" [level=2] [ref=e100]
+              - generic [ref=e101]: Al día
+            - generic [ref=e102]:
+              - generic [ref=e103]:
+                - generic [ref=e104]: Última copia
+                - generic [ref=e105]: hoy 05:38 · 94 s
+              - generic [ref=e106]:
+                - generic [ref=e107]: Tamaño de una copia
+                - generic [ref=e108]: 13.2 GB
+              - generic [ref=e109]:
+                - generic [ref=e110]: 9 copias guardadas
+                - generic [ref=e111]: 29.3 GB en total
+              - button "Hacer copia ahora" [ref=e112] [cursor=pointer]
+              - generic [ref=e113]: Cada día a las 04:00 · /srv/appdata → backup@nas:/backups/homelab · se guardan 7 días
+        - generic [ref=e114]:
+          - heading "Discos" [level=2] [ref=e115]
+          - list [ref=e116]:
+            - listitem [ref=e117]:
+              - generic [ref=e118]:
+                - generic [ref=e119]: /
+                - generic [ref=e120]: 292 GB libres · 37%
+            - listitem [ref=e123]:
+              - generic [ref=e124]:
+                - generic [ref=e125]: media
+                - generic [ref=e126]: 2.2 TB libres · 70%
+            - listitem [ref=e129]:
+              - generic [ref=e130]:
+                - generic [ref=e131]: backup
+                - generic [ref=e132]: 205 GB libres · 89%
+      - heading "Acciones rápidas" [level=2] [ref=e136]
+  - navigation [ref=e138]:
+    - link "◉ Estado" [ref=e139] [cursor=pointer]:
+      - /url: "#status"
+      - generic [ref=e140]: ◉
+      - text: Estado
+    - link "▤ Servicios" [ref=e141] [cursor=pointer]:
+      - /url: "#services"
+      - generic [ref=e142]: ▤
+      - text: Servicios
+    - link "›_ Terminal" [ref=e143] [cursor=pointer]:
+      - /url: "#terminal"
+      - generic [ref=e144]: ›_
+      - text: Terminal
+    - link "✳ Claude" [ref=e145] [cursor=pointer]:
+      - /url: "#claude"
+      - generic [ref=e146]: ✳
+      - text: Claude

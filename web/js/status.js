@@ -22,7 +22,7 @@ function render(d) {
   $("st-temp").textContent = d.temp != null ? `${Math.round(d.temp)}°` : "–";
   $("st-up").textContent = d.containers.up;
   const down = $("st-down");
-  down.textContent = d.containers.down ? `${d.containers.down} caídos` : "todos en marcha";
+  down.textContent = d.containers.down ? `${d.containers.down} ${d.containers.down === 1 ? "caído" : "caídos"}` : "todos en marcha";
   down.classList.toggle("bad", d.containers.down > 0);
   $("st-containers").href = d.containers.down ? "#services/down" : "#services";
   $("st-disks").replaceChildren(...d.disks.map((k) => {

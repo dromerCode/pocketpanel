@@ -7,6 +7,15 @@ only what you use.
 
 > 🇪🇸 La interfaz está en español. [Instrucciones en español más abajo](#en-español).
 
+<p align="center">
+  <img src="docs/screenshots/phone.png" alt="pocketpanel on a phone: status, containers, Claude Code chat and terminal" width="100%">
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/trailer.mp4"><img src="docs/screenshots/trailer-poster.png" alt="Watch the 30-second trailer" width="70%"></a><br>
+  <sub>▶ <a href="docs/screenshots/trailer.mp4">Watch the 30-second trailer</a> · screenshots use demo data</sub>
+</p>
+
 ## Features
 
 Always on:
@@ -27,6 +36,10 @@ Optional modules (`config.yml` → `modules:`):
 | `backups` | Nightly incremental backups (rsync + hardlinks) of a folder to another machine over SSH, restore one app's folder from the container sheet | `rsync` on both ends |
 | `raid` | mdadm RAID state + SMART (local or on another box over SSH) | `mdadm`, `smartctl` |
 | `jellyfin` | Manage Jellyfin accounts and invites through [jfa-go](https://github.com/hrfee/jfa-go) | jfa-go |
+
+On a wide screen it switches to a sidebar layout:
+
+![pocketpanel desktop layout](docs/screenshots/desktop.png)
 
 ## Install (Ubuntu / Debian + Docker + Tailscale)
 
