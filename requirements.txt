@@ -9,3 +9,4 @@ python-multipart==0.0.32
 tzdata==2026.1
 ruamel.yaml==0.19.1
 cryptography==50.0.2
+qrcode==8.2
