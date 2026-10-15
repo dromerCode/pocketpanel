@@ -27,6 +27,8 @@ MODULE_DEFAULTS: dict[str, dict] = {
                 "excludes": ["cache/", "Cache/", "logs/", "log/", "*.log", "transcodes/"]},
     "raid": {"enabled": False, "device": "/dev/md0", "ssh": "", "ssh_options": "", "sudo": False},
     "sites": {"enabled": False, "urls": [], "interval": 5, "cert_warn_days": 14},
+    "downloads": {"enabled": False, "qbittorrent_url": "", "sonarr_url": "", "radarr_url": "",
+                  "notify_finished": True},
     "jellyfin": {"enabled": False, "jfa_url": "http://127.0.0.1:8056", "jellyfin_url": "http://127.0.0.1:8096",
                  "public_url": "", "db": ""},
 }

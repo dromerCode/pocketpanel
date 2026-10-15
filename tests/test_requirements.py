@@ -81,3 +81,23 @@ def test_scripts_really_run_in_a_shell(tmp_path):
     r = {x["label"]: x for x in parse_checks(out, labels)}
     assert r["El dispositivo existe"] == {"label": "El dispositivo existe", "ok": False, "level": "error",
                                           "detail": "no existe /no/existe"}
+
+
+async def test_downloads_checks_each_configured_service():
+    def handler(req):
+        if req.url.host == "qb" and req.url.path == "/api/v2/auth/login":
+            return httpx.Response(200, text="Ok.", headers={"set-cookie": "SID=1"})
+        if req.url.host == "qb":
+            return httpx.Response(200, json=[])
+        if req.url.host == "sonarr":
+            return httpx.Response(401)
+        return httpx.Response(404)
+
+    http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    vals = {"qbittorrent_url": "http://qb", "qbittorrent_user": "u", "qbittorrent_pass": "p",
+            "sonarr_url": "http://sonarr", "sonarr_key": "x", "radarr_url": "", "radarr_key": "",
+            "notify_finished": True}
+    r = await check_module("downloads", vals, SSH(""), http=http)
+    assert [(x["label"], x["ok"]) for x in r] == [("qBittorrent responde y el usuario es correcto", True),
+                                                   ("Sonarr responde y la API key es correcta", False)]
+    assert "API key" in r[1]["detail"]

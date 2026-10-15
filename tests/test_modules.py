@@ -13,6 +13,7 @@ modules:
   backups: {enabled: true, source: /srv/appdata, dest: "bk@nas:/backups"}
   raid: {enabled: true}
   sites: {enabled: true}
+  downloads: {enabled: true, qbittorrent_url: 'http://127.0.0.1:1'}
   jellyfin: {enabled: true}
 """
 NONE = """

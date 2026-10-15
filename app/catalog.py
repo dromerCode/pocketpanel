@@ -73,6 +73,20 @@ CATALOG = {
             f("cert_warn_days", "Avisar si al certificado le quedan (días)", "int"),
         ],
     },
+    "downloads": {
+        "icon": "↓", "title": "Descargas",
+        "desc": "qBittorrent, Sonarr y Radarr: descargas activas, pausar, cola y próximos estrenos, con avisos.",
+        "fields": [
+            f("qbittorrent_url", "URL de qBittorrent", help="p. ej. http://127.0.0.1:8080. Vacío = sin qBittorrent"),
+            f("qbittorrent_user", "Usuario de qBittorrent", "secret"),
+            f("qbittorrent_pass", "Contraseña de qBittorrent", "secret"),
+            f("sonarr_url", "URL de Sonarr", help="Vacío = sin Sonarr"),
+            f("sonarr_key", "API key de Sonarr", "secret", "Sonarr → Settings → General"),
+            f("radarr_url", "URL de Radarr", help="Vacío = sin Radarr"),
+            f("radarr_key", "API key de Radarr", "secret", "Radarr → Settings → General"),
+            f("notify_finished", "Avisar cuando termine una descarga", "bool"),
+        ],
+    },
     "jellyfin": {
         "icon": "☺", "title": "Usuarios de Jellyfin", "desc": "Cuentas e invitaciones de Jellyfin a través de jfa-go.",
         "fields": [

@@ -107,3 +107,22 @@ def test_sites_api(tmp_path):
     c, _, _ = make(tmp_path, "modules:\n  sites: {enabled: true, urls: ['https://a.example.com']}\n")
     r = c.get("/api/sites").json()
     assert r[0]["name"] == "a.example.com" and r[0]["ok"] is None
+
+
+def test_downloads_api_reports_each_service(tmp_path):
+    c, _, _ = make(tmp_path, "modules:\n  downloads: {enabled: true, qbittorrent_url: 'http://127.0.0.1:1',"
+                             " sonarr_url: 'http://127.0.0.1:1'}\n")
+    r = c.get("/api/downloads").json()
+    assert r["qbit"]["ok"] is False and "no responde" in r["qbit"]["error"]
+    assert [a["kind"] for a in r["arr"]] == ["sonarr"] and r["arr"][0]["ok"] is False
+    assert c.post(f"/api/downloads/torrents/{'z' * 40}/pause").status_code == 400
+    assert c.post(f"/api/downloads/torrents/{'a' * 40}/explode").status_code == 404
+
+
+def test_downloads_secrets_are_masked(tmp_path):
+    c, _, _ = make(tmp_path)
+    assert c.put("/api/modules/downloads", json={"enabled": True, "values": {
+        "qbittorrent_url": "http://qb", "qbittorrent_pass": "pw", "sonarr_key": "k"}}).status_code == 200
+    mods = {m["name"]: m for m in c.get("/api/modules").json()["modules"]}
+    v = mods["downloads"]["values"]
+    assert v["qbittorrent_pass"] == {"set": True} and v["sonarr_key"] == {"set": True} and v["radarr_key"] == {"set": False}

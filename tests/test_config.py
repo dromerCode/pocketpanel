@@ -94,7 +94,8 @@ def test_example_config_valid_with_every_module_enabled(tmp_path):
     p = tmp_path / "c.yml"
     p.write_text(yaml.safe_dump(raw))
     c = load_config(str(p), {})
-    assert list(c.modules) == ["terminal", "actions", "updates", "claude", "backups", "raid", "jellyfin"]
+    from app.modules import MODULES
+    assert list(c.modules) == MODULES
 
 
 def test_claude_permission_mode_validated(tmp_path):

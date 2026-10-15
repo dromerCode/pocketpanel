@@ -51,6 +51,19 @@ modules:
     ssh_options: ""
     sudo: false                # en local: usar `sudo -n` para mdadm/smartctl (necesita regla en sudoers)
 
+  sites:                       # webs que deben responder + días que le quedan al certificado, con avisos
+    enabled: false
+    urls: []                   # ["https://midominio.com", "http://127.0.0.1:8096"]
+    interval: 5                # minutos entre comprobaciones
+    cert_warn_days: 14
+
+  downloads:                   # qBittorrent, Sonarr y Radarr (claves/contraseñas desde la app: se guardan en data/)
+    enabled: false
+    qbittorrent_url: ""        # http://127.0.0.1:8080
+    sonarr_url: ""             # http://127.0.0.1:8989
+    radarr_url: ""             # http://127.0.0.1:7878
+    notify_finished: true      # aviso push cuando termina una descarga
+
   jellyfin:                    # cuentas e invitaciones de Jellyfin a través de jfa-go
     enabled: false             # usuario/contraseña de jfa-go: desde la app (se guardan aparte, en data/)
     jfa_url: http://127.0.0.1:8056
