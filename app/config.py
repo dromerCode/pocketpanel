@@ -26,6 +26,7 @@ MODULE_DEFAULTS: dict[str, dict] = {
     "backups": {"enabled": False, "source": "", "dest": "", "ssh_key": "", "ssh_options": "", "at": "04:00", "keep_days": 7,
                 "excludes": ["cache/", "Cache/", "logs/", "log/", "*.log", "transcodes/"]},
     "raid": {"enabled": False, "device": "/dev/md0", "ssh": "", "ssh_options": "", "sudo": False},
+    "sites": {"enabled": False, "urls": [], "interval": 5, "cert_warn_days": 14},
     "jellyfin": {"enabled": False, "jfa_url": "http://127.0.0.1:8056", "jellyfin_url": "http://127.0.0.1:8096",
                  "public_url": "", "db": ""},
 }

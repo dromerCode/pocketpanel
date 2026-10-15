@@ -2,8 +2,8 @@
 import importlib
 
 # Orden de carga: los de abajo usan lo que dejan los de arriba en el contexto (backup, updater, raid).
-MODULES = ["terminal", "actions", "updates", "claude", "backups", "raid", "jellyfin"]
-LOAD_ORDER = ["raid", "backups", "updates", "terminal", "actions", "claude", "jellyfin"]
+MODULES = ["terminal", "actions", "updates", "claude", "backups", "raid", "sites", "jellyfin"]
+LOAD_ORDER = ["raid", "backups", "updates", "terminal", "actions", "claude", "sites", "jellyfin"]
 
 
 def load(ctx) -> list:

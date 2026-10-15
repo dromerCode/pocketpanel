@@ -64,6 +64,15 @@ CATALOG = {
             f("sudo", "Usar sudo para mdadm/smartctl", "bool", "Necesita una regla en sudoers"),
         ],
     },
+    "sites": {
+        "icon": "◎", "title": "Webs y certificados",
+        "desc": "Comprueba que tus webs responden y avisa si caen o si el certificado está a punto de caducar.",
+        "fields": [
+            f("urls", "Webs a vigilar", "list", "Una URL por línea: https://midominio.com, http://127.0.0.1:8096…"),
+            f("interval", "Comprobar cada (minutos)", "int"),
+            f("cert_warn_days", "Avisar si al certificado le quedan (días)", "int"),
+        ],
+    },
     "jellyfin": {
         "icon": "☺", "title": "Usuarios de Jellyfin", "desc": "Cuentas e invitaciones de Jellyfin a través de jfa-go.",
         "fields": [

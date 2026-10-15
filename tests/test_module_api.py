@@ -101,3 +101,9 @@ def test_check_uses_proposed_values(tmp_path):
     assert [x["ok"] for x in r.json()] == [True, True, False]
     assert "/dev/md9" in ssh.cmds[0]
     assert c.post("/api/modules/nope/check", json={"values": {}}).status_code == 404
+
+
+def test_sites_api(tmp_path):
+    c, _, _ = make(tmp_path, "modules:\n  sites: {enabled: true, urls: ['https://a.example.com']}\n")
+    r = c.get("/api/sites").json()
+    assert r[0]["name"] == "a.example.com" and r[0]["ok"] is None

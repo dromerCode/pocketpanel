@@ -3,4 +3,5 @@ modules:
   claude: {enabled: true}
   backups: {enabled: true, source: /srv/appdata, dest: "bk@nas:/backups"}
   raid: {enabled: true}
+  sites: {enabled: true, urls: ["https://a.example.com"]}
   jellyfin: {enabled: true}

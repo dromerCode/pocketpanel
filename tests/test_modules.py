@@ -12,6 +12,7 @@ modules:
   claude: {enabled: true}
   backups: {enabled: true, source: /srv/appdata, dest: "bk@nas:/backups"}
   raid: {enabled: true}
+  sites: {enabled: true}
   jellyfin: {enabled: true}
 """
 NONE = """
