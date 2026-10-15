@@ -32,13 +32,13 @@ function render() {
 
 /* ---------- Formulario generado del catálogo ---------- */
 
-function switchInput(checked) {
+export function switchInput(checked) {
   const input = el("input", { type: "checkbox", role: "switch" });
   input.checked = !!checked;
   return { node: el("span", { class: "switch" }, input, el("span", {})), input };
 }
 
-function field(f, value) {
+export function field(f, value) {
   let input, get;
   if (f.type === "bool") {
     const s = switchInput(value);
@@ -86,7 +86,7 @@ const closeSheet = () => { $("msheet").hidden = true; };
 
 const MARK = { ok: ["✓", "ck-ok"], warn: ["⚠", "ck-warn"], bad: ["✗", "ck-bad"] };
 
-function renderChecks(target, checks) {
+export function renderChecks(target, checks) {
   if (!checks.length) {
     target.replaceChildren(el("p", { class: "muted small" }, "No necesita nada especial."));
     return;

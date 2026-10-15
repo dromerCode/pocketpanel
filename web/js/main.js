@@ -6,6 +6,8 @@ import * as claude from "./claude.js";
 import * as users from "./users.js";
 import * as modulesView from "./modules.js";
 import * as downloads from "./downloads.js";
+import { startSetup } from "./setup.js";
+import { startTour } from "./tour.js";
 
 const views = { status, services, terminal, users, claude, modules: modulesView, downloads };
 const needs = { terminal: "terminal", users: "jellyfin", claude: "claude", downloads: "downloads" };  // vista → módulo
@@ -20,6 +22,7 @@ function showLogin() {
 }
 
 function route() {
+  if (location.hash === "#tour") return startTour();
   const name = (location.hash.slice(1).split("/")[0]) || "status";
   const view = views[name] && enabled(name) ? name : "status";
   if (current && current !== view) { views[current].hide?.(); views[current].leave?.(); }
@@ -68,6 +71,11 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
 });
 
 setUnauthorizedHandler(showLogin);
-api("/api/me").then(start).catch(() => showLogin());
+(async () => {
+  // Primera vez (sin PIN todavía): asistente
+  const setup = await fetch("/api/setup", { credentials: "same-origin" }).then((r) => r.json()).catch(() => ({}));
+  if (setup.needed) return startSetup();
+  api("/api/me").then(start).catch(() => showLogin());
+})();
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});

@@ -1,5 +1,5 @@
 // Red primero para la app (siempre la última versión), caché como respaldo sin conexión.
-const CACHE = "pocketpanel-v4";
+const CACHE = "pocketpanel-v5";
 
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));

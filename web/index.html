@@ -23,6 +23,33 @@
     </form>
   </section>
 
+  <!-- Asistente de la primera vez -->
+  <section id="setup" class="setup" hidden>
+    <div class="setup-top">
+      <div class="setup-progress"><i id="setup-bar"></i></div>
+    </div>
+    <div id="setup-step" class="setup-step"></div>
+    <div class="setup-nav">
+      <button id="setup-back" class="btn btn-ghost-wide" type="button">Atrás</button>
+      <button id="setup-next" class="btn btn-primary" type="button">Siguiente</button>
+    </div>
+  </section>
+
+  <!-- Tutorial -->
+  <div id="tour" class="tour" hidden>
+    <div id="tour-hole" class="tour-hole"></div>
+    <div id="tour-bubble" class="tour-bubble" role="dialog" aria-live="polite">
+      <b id="tour-title"></b>
+      <p id="tour-text"></p>
+      <div class="tour-actions">
+        <span id="tour-count" class="muted small"></span>
+        <span id="tour-extra"></span>
+        <button id="tour-skip" class="btn btn-sm" type="button">Saltar</button>
+        <button id="tour-next" class="btn btn-sm btn-primary" type="button">Siguiente</button>
+      </div>
+    </div>
+  </div>
+
   <main id="app" hidden>
     <!-- Estado -->
     <section id="view-status" class="view" data-view="status">
@@ -100,7 +127,8 @@
         <h1>Módulos</h1>
       </header>
       <div class="scroll pad">
-        <p class="muted small">Activa lo que uses. Al guardar, el panel se reinicia en un par de segundos.</p>
+        <p class="muted small">Activa lo que uses. Al guardar, el panel se reinicia en un par de segundos.
+          <a href="#tour" class="link">Ver el tutorial</a></p>
         <div id="mod-general"></div>
         <h2 class="section-title">Módulos</h2>
         <div id="mod-grid" class="mod-grid"></div>

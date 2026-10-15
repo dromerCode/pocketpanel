@@ -7,6 +7,8 @@ cd "$(dirname "$0")"
 
 die() { echo "✗ $*" >&2; exit 1; }
 warn() { echo "⚠ $*" >&2; }
+# Pregunta con valor por defecto; sin terminal (p. ej. por un script) se queda con el de por defecto
+ask() { local a=""; read -rp "$1 " a </dev/tty 2>/dev/null || true; echo "${a:-$2}"; }
 # Lee una variable del .env (vacío si no está)
 getv() { grep -s "^$1=" .env | head -1 | cut -d= -f2- || true; }
 # Escribe una variable en el .env conservando el resto
@@ -51,27 +53,68 @@ setv PANEL_HOST_DIR "$(pwd)"
 [ -n "$(getv PANEL_PORT)" ] || setv PANEL_PORT 9300
 [ -n "$(getv TZ)" ] || setv TZ "$(timedatectl show -p Timezone --value 2>/dev/null || echo Europe/Madrid)"
 
+[ -n "$(getv PANEL_SECRET)" ] || setv PANEL_SECRET "$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')"
+
+# PIN: lo normal es crearlo en el asistente de la app. ./install.sh NUEVOPIN lo cambia desde aquí.
 pin="${1:-}"
-if [ -n "$pin" ] || [ -z "$(getv PANEL_PIN_HASH)" ]; then
-  [ -n "$pin" ] || pin=$(python3 -c 'import secrets;print(f"{secrets.randbelow(10**6):06d}")')
-  [ -n "$(getv PANEL_SECRET)" ] || setv PANEL_SECRET "$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')"
-  # separador ':' y no '$': compose interpreta los '$' del .env
-  setv PANEL_PIN_HASH "$(PIN="$pin" python3 -c '
-import base64,hashlib,os
-s=os.urandom(16);dk=hashlib.scrypt(os.environ["PIN"].encode(),salt=s,n=2**14,r=8,p=1,dklen=32)
-print("scrypt:"+base64.b64encode(s).decode()+":"+base64.b64encode(dk).decode())')"
-  new_pin=1
+if [ -n "$pin" ]; then
+  echo "$pin" | grep -Eq '^[0-9]{4,12}$' || die "el PIN tiene que tener de 4 a 12 números"
+  PIN="$pin" python3 - <<'PY'
+import base64, hashlib, json, os
+s = os.urandom(16)
+dk = hashlib.scrypt(os.environ["PIN"].encode(), salt=s, n=2**14, r=8, p=1, dklen=32)
+f = "data/auth.json"
+try:
+    a = json.load(open(f))
+except (OSError, ValueError):
+    a = {}
+a["pin_hash"] = "scrypt:" + base64.b64encode(s).decode() + ":" + base64.b64encode(dk).decode()
+fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+with os.fdopen(fd, "w") as fh:
+    json.dump(a, fh)
+PY
+  echo "✓ PIN cambiado"
+fi
+has_pin() { [ -n "$(getv PANEL_PIN_HASH)" ] || grep -qs '"pin_hash"' data/auth.json; }
+if ! has_pin && [ -z "$(getv PANEL_SETUP_CODE)" ]; then
+  # código de un solo uso para que solo quien instala pueda hacer el asistente (sin 0/O ni 1/I/L)
+  setv PANEL_SETUP_CODE "$(python3 -c 'import secrets;a="ABCDEFGHJKMNPQRSTUVWXYZ23456789";c="".join(secrets.choice(a) for _ in range(6));print(c[:3]+"-"+c[3:])')"
 fi
 
 umask 022
-[ -f config.yml ] || { cp config.example.yml config.yml; echo "✓ config.yml creado (los módulos se activan desde la app: Estado → ⚙)"; }
+[ -f config.yml ] || cp config.example.yml config.yml
 [ -f actions.yml ] || cp actions.example.yml actions.yml
 
 docker compose up -d --build --force-recreate
 port=$(getv PANEL_PORT)
+url="http://127.0.0.1:$port"
+
+# --- Tailscale: publicarlo en tu tailnet con HTTPS (lo necesitan la app instalable y los avisos) ---
+if command -v tailscale >/dev/null; then
+  ts_url=$(tailscale status --json 2>/dev/null | python3 -c 'import json,sys
+try: print("https://"+json.load(sys.stdin)["Self"]["DNSName"].rstrip(".")+":8443")
+except Exception: pass')
+  if [ -n "$ts_url" ]; then
+    if tailscale serve status 2>/dev/null | grep -q "127.0.0.1:$port"; then
+      url="$ts_url"
+    elif [ "$(ask "¿Lo publico en tu Tailscale como $ts_url? (S/n)" s)" != n ]; then
+      sudo tailscale serve --bg --https=8443 "http://127.0.0.1:$port" >/dev/null && url="$ts_url" \
+        || warn "no se pudo publicar; hazlo a mano: sudo tailscale serve --bg --https=8443 http://127.0.0.1:$port"
+    fi
+  fi
+else
+  warn "Tailscale no está instalado: https://tailscale.com/download/linux (luego vuelve a ejecutar ./install.sh)"
+fi
+
 echo
-echo "✓ pocketpanel en marcha en http://127.0.0.1:$port"
-[ -z "${new_pin:-}" ] || echo "  PIN: $pin   (cámbialo con ./install.sh NUEVO_PIN)"
-echo "  Para abrirlo desde el móvil por Tailscale (HTTPS, necesario para instalarla y para los avisos):"
-echo "    sudo tailscale serve --bg --https=8443 http://127.0.0.1:$port"
-echo "  y entra en https://<nombre-del-servidor>.<tu-tailnet>.ts.net:8443"
+echo "✓ pocketpanel en marcha"
+if has_pin; then
+  echo "  Ábrelo en $url"
+else
+  code=$(getv PANEL_SETUP_CODE)
+  echo "  Escanea este código con el móvil para empezar (o abre $url/#setup/$code):"
+  echo
+  docker compose exec -T pocketpanel python -m app.qr "$url/#setup/$code" 2>/dev/null | sed 's/^/    /'
+  echo
+  echo "  Código de instalación: $code"
+fi
