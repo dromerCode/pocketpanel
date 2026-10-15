@@ -19,3 +19,11 @@ def test_render_conf_uses_root_copies_of_key_and_known_hosts():
 
 def test_render_without_key():
     assert "id_backup" not in render({**OPTS, "ssh_key": ""})
+
+
+def test_user_ssh_options_win_over_defaults():
+    # ssh se queda con el primer valor de cada opción: las del usuario van delante
+    conf = render({**OPTS, "ssh_options": "-o UserKnownHostsFile=/srv/kh"})
+    out = subprocess.run(["bash", "-c", conf + '\nprintf "%s" "$SSH_OPTS"'], capture_output=True, text=True,
+                         check=True).stdout
+    assert out.index("UserKnownHostsFile=/srv/kh") < out.index("UserKnownHostsFile=/etc/pocketpanel/known_hosts")

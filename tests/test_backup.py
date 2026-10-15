@@ -20,7 +20,7 @@ def test_snapshot_name():
 
 def test_env_from_config():
     assert backup_env(OPTS) == {"SRC": "/srv/appdata/", "DEST_HOST": "bk@nas", "DEST_PATH": "/backups/pp",
-                                "SSH_OPTS": "-o BatchMode=yes -o ConnectTimeout=10 -i /home/r/.ssh/id_bk -p 2222",
+                                "SSH_OPTS": "-p 2222 -o BatchMode=yes -o ConnectTimeout=10 -i /home/r/.ssh/id_bk",
                                 "KEEP_DAYS": "5", "EXCLUDES": "cache/\n*.log"}
 
 

@@ -30,11 +30,10 @@ def backup_env(opts: dict) -> dict:
     m = DEST_RE.match(opts["dest"])
     if not m:
         raise ValueError("backups.dest tiene que ser usuario@host:/ruta/absoluta")
-    ssh = ["-o BatchMode=yes -o ConnectTimeout=10"]
+    ssh = [opts["ssh_options"]] if opts.get("ssh_options") else []  # las del usuario mandan (van primero)
+    ssh.append("-o BatchMode=yes -o ConnectTimeout=10")
     if opts.get("ssh_key"):
         ssh.append(f"-i {shlex.quote(opts['ssh_key'])}")
-    if opts.get("ssh_options"):
-        ssh.append(opts["ssh_options"])
     return {"SRC": opts["source"].rstrip("/") + "/", "DEST_HOST": m.group(1), "DEST_PATH": m.group(2),
             "SSH_OPTS": " ".join(ssh), "KEEP_DAYS": str(opts.get("keep_days", 7)),
             "EXCLUDES": "\n".join(opts.get("excludes") or [])}

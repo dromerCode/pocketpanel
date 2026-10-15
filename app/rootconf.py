@@ -15,11 +15,11 @@ ROOT = "/etc/pocketpanel"
 
 def render(opts: dict) -> str:
     e = backup_env({**opts, "ssh_key": ""})
-    ssh = ["-o BatchMode=yes -o ConnectTimeout=10", f"-o UserKnownHostsFile={ROOT}/known_hosts"]
+    # ssh se queda con el primer valor de cada opción: las del usuario van delante para que manden
+    ssh = [opts["ssh_options"]] if opts.get("ssh_options") else []
+    ssh += ["-o BatchMode=yes -o ConnectTimeout=10", f"-o UserKnownHostsFile={ROOT}/known_hosts"]
     if opts.get("ssh_key"):
         ssh.append(f"-i {ROOT}/id_backup")
-    if opts.get("ssh_options"):
-        ssh.append(opts["ssh_options"])
     conf = {"SRC": e["SRC"], "DEST_HOST": e["DEST_HOST"], "DEST_PATH": e["DEST_PATH"], "KEEP_DAYS": e["KEEP_DAYS"],
             "EXCLUDES_FILE": f"{ROOT}/excludes.txt", "SSH_OPTS": " ".join(ssh)}
     return "# Generado por install-root.sh desde config.yml. No editar a mano.\n" + "".join(
