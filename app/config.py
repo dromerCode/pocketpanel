@@ -11,6 +11,14 @@ import yaml
 from .secrets import load_secrets
 
 
+def _load_auth(data_dir: str) -> dict:
+    import json
+    try:
+        return json.loads((Path(data_dir) / "auth.json").read_text())
+    except (OSError, ValueError):
+        return {}
+
+
 class ConfigError(Exception):
     pass
 
@@ -53,7 +61,8 @@ class Config:
     services: dict
     modules: dict  # solo los activos, con sus valores por defecto
     pin_hash: str = ""
-    secret: str = "dev-secret"
+    secret: str = ""
+    setup_code: str = ""
     ssh_host: str = "127.0.0.1"
     ssh_port: int = 22
     ssh_user: str = "root"
@@ -150,6 +159,7 @@ def load_config(path: str | None = None, env: Mapping | None = None) -> Config:
     root = Path(__file__).resolve().parent.parent
     data_dir = e("PANEL_DATA", "/data")
     jfa = load_secrets(data_dir).get("jellyfin", {})
+    stored = _load_auth(data_dir)
     claude_home = e("CLAUDE_HOME", "")
     try:
         ssh_port = int(e("PANEL_SSH_PORT", "22"))
@@ -158,8 +168,9 @@ def load_config(path: str | None = None, env: Mapping | None = None) -> Config:
     return Config(
         **top,
         modules=_modules(raw.get("modules")),
-        pin_hash=e("PANEL_PIN_HASH", ""),
-        secret=e("PANEL_SECRET", "dev-secret"),
+        pin_hash=stored.get("pin_hash") or e("PANEL_PIN_HASH", ""),
+        secret=e("PANEL_SECRET", "") or stored.get("secret", ""),
+        setup_code=e("PANEL_SETUP_CODE", ""),
         ssh_host=e("PANEL_SSH_HOST", "127.0.0.1"),
         ssh_port=ssh_port,
         ssh_user=e("PANEL_HOST_USER", "root"),

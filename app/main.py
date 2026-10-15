@@ -1,6 +1,8 @@
 import asyncio
+import hmac
 import logging
 import os
+import re
 import signal
 import time
 from contextlib import asynccontextmanager
@@ -15,6 +17,7 @@ from .catalog import CATALOG, GENERAL, secret_keys
 from .config import Config, ConfigError, saved_values, settings
 from .config_writer import apply_changes
 from .core import json_body
+from .authstore import ensure_secret, save_pin
 from .secrets import load_secrets, save_secrets
 from .core import Context
 from .docker_api import DockerClient, DockerError
@@ -39,9 +42,14 @@ def _restart() -> None:
     asyncio.get_running_loop().call_later(0.5, os.kill, os.getpid(), signal.SIGTERM)
 
 
+PIN_RE = re.compile(r"^\d{4,12}$")
+
+
 def create_app(cfg: Config, restart=None) -> FastAPI:
     restart = restart or _restart
     Path(cfg.data_dir).mkdir(parents=True, exist_ok=True)
+    if not cfg.secret:
+        cfg.secret = ensure_secret(cfg.data_dir)
     ctx = Context(cfg=cfg, ssh=SSH(cfg.ssh_host, cfg.ssh_user, cfg.ssh_key, cfg.known_hosts, cfg.ssh_port),
                   docker=DockerClient(cfg.docker_sock), push=PushService(cfg.data_dir, cfg.push_contact))
     ctx.history = HistoryDB(f"{cfg.data_dir}/history.db")
@@ -146,6 +154,72 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
     @app.post("/api/push/test", dependencies=authed)
     async def push_test():
         return {"sent": await ctx.push.send(cfg.name, "Así se verán los avisos 👍", "/#status")}
+
+    # ---------- Asistente de instalación (solo mientras no hay PIN) ----------
+
+    def _setup_code(request: Request, code: str) -> None:
+        ip = _ip(request)
+        if not limiter.allowed(ip):
+            raise HTTPException(429, "demasiados intentos, espera unos minutos")
+        norm = lambda c: re.sub(r"[^A-Z0-9]", "", (c or "").upper())  # noqa: E731
+        if not cfg.setup_code or not hmac.compare_digest(norm(code), norm(cfg.setup_code)):
+            limiter.fail(ip)
+            raise HTTPException(403, "código de instalación incorrecto (te lo dio ./install.sh)")
+
+    @app.get("/api/setup")
+    async def setup_info(request: Request, code: str | None = None):
+        if cfg.pin_hash or code is None:
+            return {"needed": not cfg.pin_hash}
+        _setup_code(request, code)
+        try:
+            hostname = (await ctx.ssh.run("hostname", timeout=8)).strip()
+        except SSHError:
+            hostname = ""
+        return {"needed": True, "hostname": hostname, "timezone": cfg.timezone, "name": cfg.name,
+                "modules": [_module_view(m) for m in modules.MODULES]}
+
+    @app.post("/api/setup/check/{name}")
+    async def setup_check(name: str, request: Request):
+        from .requirements import check_module
+        b = await json_body(request)
+        if cfg.pin_hash:
+            raise HTTPException(409, "ya está configurado")
+        _setup_code(request, str(b.get("code", "")))
+        if name not in CATALOG:
+            raise HTTPException(404, "módulo desconocido")
+        return await check_module(name, {**saved_values(cfg.config_path, name), **(b.get("values") or {})}, ctx.ssh)
+
+    @app.post("/api/setup")
+    async def setup_done(request: Request, response: Response):
+        b = await json_body(request)
+        if cfg.pin_hash:
+            raise HTTPException(409, "ya está configurado: entra con tu PIN")
+        _setup_code(request, str(b.get("code", "")))
+        pin = str(b.get("pin", ""))
+        if not PIN_RE.match(pin):
+            raise HTTPException(400, "el PIN tiene que tener de 4 a 12 números")
+        mods, secrets = {}, {}
+        for name, ch in (b.get("modules") or {}).items():
+            if name not in CATALOG or not isinstance(ch, dict):
+                raise HTTPException(400, f"modules.{name}: módulo desconocido")
+            values = dict(ch.get("values") or {})
+            secrets[name] = {k: str(values.pop(k) or "") for k in list(values) if k in secret_keys(name)}
+            mods[name] = {"enabled": ch.get("enabled"), "values": values}
+        general = {k: b[k] for k in ("name", "timezone") if b.get(k)}
+        try:
+            apply_changes(cfg.config_path, {"PANEL_DATA": cfg.data_dir}, general=general, modules=mods)
+        except ConfigError as e:
+            raise HTTPException(400, str(e))
+        for name, vals in secrets.items():
+            if vals:
+                save_secrets(cfg.data_dir, name, vals)
+        cfg.pin_hash = save_pin(cfg.data_dir, pin)
+        limiter.ok(_ip(request))
+        https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+        response.set_cookie(auth.COOKIE, auth.make_token(cfg.secret), max_age=auth.TOKEN_MAX_AGE,
+                            httponly=True, samesite="strict", secure=https)
+        restart()
+        return {"ok": True}
 
     # ---------- Tienda de módulos ----------
 

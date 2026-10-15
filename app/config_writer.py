@@ -18,7 +18,8 @@ def _yaml() -> YAML:
 
 
 def apply_changes(path: str, env, *, general: dict | None = None, module: str | None = None,
-                  enabled: bool | None = None, values: dict | None = None) -> None:
+                  enabled: bool | None = None, values: dict | None = None, modules: dict | None = None) -> None:
+    """Un módulo (module/enabled/values) o varios de golpe (modules={nombre: {enabled, values}})."""
     y = _yaml()
     p = Path(path)
     data = y.load(p.read_text()) if p.exists() and p.read_text().strip() else None
@@ -30,7 +31,11 @@ def apply_changes(path: str, env, *, general: dict | None = None, module: str | 
             if k not in allowed:
                 raise ConfigError(f"{k}: no se puede cambiar desde aquí")
             data[k] = v
+    changes = dict(modules or {})
     if module is not None:
+        changes[module] = {"enabled": enabled, "values": values}
+    for module, ch in changes.items():
+        enabled, values = (ch or {}).get("enabled"), (ch or {}).get("values")
         if module not in MODULE_DEFAULTS:
             raise ConfigError(f"modules.{module}: módulo desconocido")
         mods = data.setdefault("modules", CommentedMap())
