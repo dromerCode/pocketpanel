@@ -25,7 +25,7 @@ Always on:
 - **Push alerts** (Web Push): a container stops, a disk fills up, a module reports a problem.
 - PIN login with rate limiting, installable as an app on Android / iOS.
 
-Optional modules (`config.yml` → `modules:`):
+Optional modules, turned on and configured from the app itself (**Status → ⚙ Modules**):
 
 | Module | What it does | Needs on the host |
 |---|---|---|
@@ -65,15 +65,15 @@ and open `https://<server>.<your-tailnet>.ts.net:8443` on your phone → browser
 
 ### Configure
 
-Edit `config.yml` (every option is commented) and apply with:
+Open **Status → ⚙** in the app: a "module store" where you switch modules on and off, fill in their options,
+run a requirements check on the server (is `rsync` there? can it SSH into the backup box? is `claude` installed?)
+and save. The panel rewrites `config.yml` (keeping your comments) and restarts itself in a couple of seconds.
 
-```sh
-docker compose up -d --force-recreate
-```
+<p align="center"><img src="docs/screenshots/modules.png" alt="Modules screen" width="320"></p>
 
-If you enable `claude`, run `./install.sh` again so it mounts the Claude Code sessions. jfa-go credentials go in
-`.env` as `PANEL_JFA_USER=` / `PANEL_JFA_PASS=`. Change the PIN with `./install.sh NEWPIN`.
-Update with `git pull && ./install.sh`.
+You can still edit `config.yml` by hand (every option is commented) and apply with
+`docker compose up -d --force-recreate`. Passwords entered in the app (jfa-go) are stored in `data/secrets.json`
+(0600), not in `config.yml`. Change the PIN with `./install.sh NEWPIN`. Update with `git pull && ./install.sh`.
 
 ### Backups as root (optional)
 
@@ -132,7 +132,7 @@ cd ~/pocketpanel
 ./install.sh
 ```
 
-Te pregunta si vas a usar Claude Code (si no lo tienes, di que no) y al final te enseña el **PIN**: apúntalo.
+Al final te enseña el **PIN**: apúntalo.
 
 **2. Abrirlo desde el móvil por Tailscale:**
 
@@ -145,28 +145,19 @@ En el móvil (conectado a tu tailnet) entra en `https://<nombre-del-servidor>.<t
 navegador dale a **"Instalar aplicación"** / "Añadir a pantalla de inicio". En Estado, la campanita 🔕 activa
 los avisos push.
 
-**3. Configurarlo a tu gusto** (opcional): edita `~/pocketpanel/config.yml` (está todo comentado: nombre del
-servidor, discos a mostrar, botones de "Abrir" de cada contenedor y los módulos extra: backups, RAID, Claude,
-Jellyfin) y aplica con:
+**3. Activar módulos** (opcional): en la app, **Estado → ⚙**. Es una "tienda" con todos los módulos (backups,
+RAID, Claude, usuarios de Jellyfin…): tocas uno, lo activas, rellenas sus opciones, pulsas **Comprobar requisitos**
+(mira en el servidor si tienes lo necesario) y **Guardar y reiniciar**. El panel se reinicia solo en un par de
+segundos. En "Ajustes generales" cambias el nombre del servidor, los discos que se ven, etc.
 
-```sh
-docker compose up -d --force-recreate
-```
+**Con Claude Code** (si ya lo tienes instalado y con sesión iniciada en el servidor): actívalo en ⚙ y en
+**Permisos** elige `auto` (o `bypassPermissions`); si no, el chat no puede ejecutar comandos. El HOME y la carpeta
+de trabajo se detectan solos. Aparece la pestaña Claude (chat con adjuntos, botón de diagnóstico y resumen diario
+por push) y el modo "tmux claude" en la terminal. Si instalaste `claude` con npm, pon su ruta en **Ruta de claude**
+(la ves con `which claude`).
 
-Los botones de acciones rápidas se editan en `actions.yml` (se recargan solos).
-
-**Con Claude Code** (si ya lo tienes instalado y con sesión iniciada en el servidor): en `./install.sh` contesta
-`s` a la pregunta de Claude (el HOME y la carpeta de trabajo por defecto suelen valer) y en `config.yml` pon:
-
-```yaml
-  claude:
-    enabled: true
-    permission_mode: auto        # o bypassPermissions; si no, el chat no puede ejecutar comandos
-```
-
-Aplica con `docker compose up -d --force-recreate`. Aparece la pestaña Claude (chat con adjuntos, botón de
-diagnóstico y resumen diario por push a las 09:00) y el modo "tmux claude" en la terminal. Si instalaste `claude`
-con npm en vez del instalador oficial, pon su ruta en `bin:` (la ves con `which claude`).
+Si prefieres, todo sigue estando en `~/pocketpanel/config.yml` (comentado) para editarlo a mano y aplicar con
+`docker compose up -d --force-recreate`. Los botones de acciones rápidas se editan en `actions.yml`.
 
 **Otras cosas:**
 
