@@ -167,3 +167,9 @@ async def test_watcher_one_service_down_does_not_hide_others():
     await w.tick(0, 0)
     good.msgs = ["Disco lleno"]
     assert await w.tick(10, 0) == [("Radarr: Disco lleno", "/#downloads")]
+
+
+async def test_missing_credentials_message():
+    q = QBit("http://qb", "", "", http=httpx.AsyncClient(transport=httpx.MockTransport(qbit_handler())))
+    with pytest.raises(DownloadsError, match="pide usuario y contraseña"):
+        await q.torrents()

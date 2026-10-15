@@ -2,6 +2,7 @@ import { api, el, fmtBytes, fmtUptime, has, panel, toast } from "./api.js";
 import { renderCharts } from "./charts.js";
 import { initActions, loadActions } from "./actions.js";
 import { initPush } from "./push.js";
+import { speed } from "./downloads.js";
 
 let timer = null;
 let slowTimer = null;
@@ -150,8 +151,41 @@ async function backupNow() {
   }
 }
 
+function siteRow(s) {
+  const cert = s.cert_days == null ? "" : `🔒 ${s.cert_days} d`;
+  const certCls = s.cert_days == null ? "" : s.cert_days < 0 || s.cert_days <= 3 ? "cert-bad" : s.cert_days <= 14 ? "cert-warn" : "";
+  return el("li", {},
+    el("i", { class: `dot ${s.ok === false ? "off" : ""}`, style: s.ok == null ? "background:var(--muted)" : null }),
+    el("a", { class: "site-name", href: s.url, target: "_blank", rel: "noopener" }, s.name),
+    el("span", { class: "site-meta" }, s.ms != null ? `${s.ms} ms ` : "", el("span", { class: certCls }, cert)),
+    s.ok === false ? el("span", { class: "site-err" }, s.error) : null);
+}
+
+async function loadSites(fresh = false) {
+  try {
+    const list = await api(fresh ? "/api/sites/check" : "/api/sites", fresh ? { method: "POST" } : {});
+    $("sites").replaceChildren(...(list.length ? list.map(siteRow)
+      : [el("li", { class: "muted small" }, "Añade webs en ⚙ → Webs y certificados")]));
+  } catch (e) {
+    if (e.message !== "no autenticado") $("sites").replaceChildren(el("li", { class: "muted small" }, e.message));
+  }
+}
+
+async function loadDownloads() {
+  try {
+    const d = await api("/api/downloads/summary");
+    $("dl-down").textContent = `↓ ${speed(d.dl)}`;
+    $("dl-up").textContent = `↑ ${speed(d.up)}`;
+    $("dl-sub").textContent = d.error || [`${d.active} activas`, d.paused ? `${d.paused} en pausa` : null].filter(Boolean).join(" · ");
+    $("dl-sub").classList.toggle("bad", !!d.error);
+  } catch (e) {
+    if (e.message !== "no autenticado") $("dl-sub").textContent = e.message;
+  }
+}
+
 function slowTick() {
   loadHistory();
+  if (has("sites")) loadSites();
   if (has("raid")) loadRaid();
   if (has("backups")) loadBackup();
 }
@@ -167,6 +201,7 @@ export function init() {
   new ResizeObserver(() => { if (lastHistory.length) renderCharts($("charts"), lastHistory, range); }).observe($("charts"));
   if (has("actions")) initActions();
   initPush();
+  $("sites-check").onclick = () => { $("sites").replaceChildren(el("li", { class: "muted small" }, "Comprobando…")); loadSites(true); };
 }
 
 export function show() {
@@ -174,7 +209,8 @@ export function show() {
   tick();
   slowTick();
   if (has("actions")) loadActions();
-  timer = setInterval(tick, 5000);
+  timer = setInterval(() => { tick(); if (has("downloads")) loadDownloads(); }, 5000);
+  if (has("downloads")) loadDownloads();
   slowTimer = setInterval(slowTick, 30000);
 }
 

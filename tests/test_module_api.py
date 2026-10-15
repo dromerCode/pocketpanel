@@ -126,3 +126,19 @@ def test_downloads_secrets_are_masked(tmp_path):
     mods = {m["name"]: m for m in c.get("/api/modules").json()["modules"]}
     v = mods["downloads"]["values"]
     assert v["qbittorrent_pass"] == {"set": True} and v["sonarr_key"] == {"set": True} and v["radarr_key"] == {"set": False}
+
+
+def test_downloads_summary(tmp_path):
+    c, _, _ = make(tmp_path, "modules:\n  downloads: {enabled: true, qbittorrent_url: 'http://qb'}\n")
+
+    class Q:
+        async def torrents(self):
+            return [{"hash": "a" * 40, "name": "x", "done": False, "paused": False, "dl": 10},
+                    {"hash": "b" * 40, "name": "y", "done": False, "paused": True, "dl": 0},
+                    {"hash": "c" * 40, "name": "z", "done": True, "paused": False, "dl": 0}]
+
+        async def transfer(self):
+            return {"dl": 10, "up": 5}
+
+    c.app.state.ctx.downloads_qbit = Q()
+    assert c.get("/api/downloads/summary").json() == {"active": 1, "paused": 1, "dl": 10, "up": 5, "error": None}

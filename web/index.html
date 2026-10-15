@@ -51,6 +51,13 @@
 
         <div class="st-cols">
           <div>
+            <div data-module="downloads">
+              <h2 class="section-title">Descargas</h2>
+              <a id="dl-card" class="card card-link dl-card" href="#downloads">
+                <span class="dl-speeds mono"><b id="dl-down">↓ –</b><span id="dl-up">↑ –</span></span>
+                <span id="dl-sub" class="card-sub">Cargando…</span>
+              </a>
+            </div>
             <div data-module="raid">
               <div class="section-head">
                 <h2 class="section-title">RAID</h2>
@@ -69,6 +76,13 @@
           <div>
             <h2 class="section-title">Discos</h2>
             <ul id="st-disks" class="disks"></ul>
+            <div data-module="sites">
+              <div class="section-head">
+                <h2 class="section-title">Webs</h2>
+                <button id="sites-check" class="btn btn-sm" title="Comprobar ahora">⟳</button>
+              </div>
+              <ul id="sites" class="sites card"><li class="muted small">Cargando…</li></ul>
+            </div>
           </div>
         </div>
 
@@ -90,6 +104,19 @@
         <div id="mod-general"></div>
         <h2 class="section-title">Módulos</h2>
         <div id="mod-grid" class="mod-grid"></div>
+      </div>
+    </section>
+
+    <!-- Descargas -->
+    <section id="view-downloads" class="view" data-view="downloads" hidden>
+      <header class="topbar">
+        <a href="#status" class="icon-btn" aria-label="Volver">←</a>
+        <h1>Descargas</h1>
+        <span id="dlv-speeds" class="muted mono small"></span>
+      </header>
+      <div class="scroll pad">
+        <div id="dlv-actions" class="btn-row"></div>
+        <div id="dlv-body"></div>
       </div>
     </section>
 

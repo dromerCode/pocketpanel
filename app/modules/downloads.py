@@ -23,6 +23,7 @@ def setup(ctx) -> APIRouter:
     qbit = QBit(m["qbittorrent_url"], s.get("qbittorrent_user", ""), s.get("qbittorrent_pass", "")) \
         if m["qbittorrent_url"] else None
     arrs = [Arr(k, m[f"{k}_url"], s.get(f"{k}_key", "")) for k in ("sonarr", "radarr") if m[f"{k}_url"]]
+    ctx.downloads_qbit = qbit
     ctx.hooks.append(DownloadsWatcher(qbit, arrs, notify_finished=m["notify_finished"]))
     ctx.info["downloads"] = {"qbit": bool(qbit), "arr": [a.kind for a in arrs]}
     r = APIRouter(dependencies=[Depends(auth.require_auth)])
@@ -39,13 +40,23 @@ def setup(ctx) -> APIRouter:
                                "upcoming": up or []})
         return out
 
+    @r.get("/api/downloads/summary")
+    async def summary():
+        q = ctx.downloads_qbit
+        if not q:
+            return {"active": 0, "paused": 0, "dl": 0, "up": 0, "error": None}
+        (ts, e1), (tr, e2) = await asyncio.gather(_safe(q.torrents()), _safe(q.transfer()))
+        ts, tr = ts or [], tr or {"dl": 0, "up": 0}
+        return {"active": sum(1 for t in ts if not t["done"] and not t["paused"]),
+                "paused": sum(1 for t in ts if not t["done"] and t["paused"]), **tr, "error": e1 or e2}
+
     async def _toggle(hashes: str, verb: str):
         if verb not in ("pause", "resume"):
             raise HTTPException(404, "acción desconocida")
-        if not qbit:
+        if not ctx.downloads_qbit:
             raise HTTPException(404, "qBittorrent no está configurado")
         try:
-            await qbit.set_paused(hashes, verb == "pause")
+            await ctx.downloads_qbit.set_paused(hashes, verb == "pause")
         except DownloadsError as e:
             raise HTTPException(503, str(e))
         return {"ok": True}

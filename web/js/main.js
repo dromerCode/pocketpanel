@@ -5,9 +5,10 @@ import * as terminal from "./terminal.js";
 import * as claude from "./claude.js";
 import * as users from "./users.js";
 import * as modulesView from "./modules.js";
+import * as downloads from "./downloads.js";
 
-const views = { status, services, terminal, users, claude, modules: modulesView };
-const needs = { terminal: "terminal", users: "jellyfin", claude: "claude" };  // vista → módulo
+const views = { status, services, terminal, users, claude, modules: modulesView, downloads };
+const needs = { terminal: "terminal", users: "jellyfin", claude: "claude", downloads: "downloads" };  // vista → módulo
 const enabled = (v) => !needs[v] || has(needs[v]);
 let current = null;
 let started = false;

@@ -39,6 +39,8 @@ class QBit:
             if r.status_code == 403 and attempt == 1 and self.user:
                 self._logged = False  # sesión caducada: entrar otra vez
                 continue
+            if r.status_code == 403 and not self.user:
+                raise DownloadsError("qBittorrent pide usuario y contraseña: ponlos en ⚙ → Descargas")
             return r
         return r
 
