@@ -1,0 +1,84 @@
+import json
+
+from fastapi.testclient import TestClient
+
+from app import auth
+from app.config import load_config
+from app.main import create_app
+
+YML = "name: casa  # comentario\nmodules:\n  raid: {enabled: false, device: /dev/md5}\n"
+
+
+def make(tmp_path, yml=YML):
+    p = tmp_path / "config.yml"
+    p.write_text(yml)
+    env = {"PANEL_PIN_HASH": auth.hash_pin("1234"), "PANEL_SECRET": "s", "PANEL_DATA": str(tmp_path / "data"),
+           "PANEL_UPLOADS": str(tmp_path / "up"), "PANEL_CONFIG": str(p)}
+    restarts = []
+    c = TestClient(create_app(load_config(str(p), env), restart=lambda: restarts.append(1)))
+    assert c.post("/api/login", json={"pin": "1234"}).status_code == 200
+    return c, p, restarts
+
+
+def test_list_modules(tmp_path):
+    c, _, _ = make(tmp_path)
+    r = c.get("/api/modules").json()
+    assert r["general"]["values"]["name"] == "casa"
+    mods = {m["name"]: m for m in r["modules"]}
+    assert mods["terminal"]["enabled"] is True and mods["raid"]["enabled"] is False
+    assert mods["raid"]["values"]["device"] == "/dev/md5"  # aunque esté apagado, lo guardado se ve
+    assert mods["raid"]["title"] == "RAID" and mods["raid"]["fields"]
+    assert mods["jellyfin"]["values"]["jfa_pass"] == {"set": False}
+
+
+def test_enable_module_writes_and_restarts(tmp_path):
+    c, p, restarts = make(tmp_path)
+    r = c.put("/api/modules/raid", json={"enabled": True, "values": {"device": "/dev/md1"}})
+    assert r.status_code == 200 and r.json() == {"restart": True}
+    assert restarts == [1] and "# comentario" in p.read_text()
+    assert load_config(str(p), {}).mod("raid")["device"] == "/dev/md1"
+
+
+def test_invalid_is_400_and_nothing_changes(tmp_path):
+    c, p, restarts = make(tmp_path)
+    r = c.put("/api/modules/backups", json={"enabled": True, "values": {"source": "/srv"}})
+    assert r.status_code == 400 and "modules.backups.dest" in r.json()["detail"]
+    assert p.read_text() == YML and restarts == []
+
+
+def test_unknown_module_404(tmp_path):
+    c, _, _ = make(tmp_path)
+    assert c.put("/api/modules/nope", json={"enabled": True}).status_code == 404
+
+
+def test_secrets_go_to_secrets_file(tmp_path):
+    c, p, _ = make(tmp_path)
+    r = c.put("/api/modules/jellyfin", json={"enabled": True, "values": {"jfa_user": "admin", "jfa_pass": "pw",
+                                                                         "public_url": "https://j.example.com"}})
+    assert r.status_code == 200
+    assert "pw" not in p.read_text() and "admin" not in p.read_text()
+    assert json.loads((tmp_path / "data" / "secrets.json").read_text())["jellyfin"]["jfa_pass"] == "pw"
+    mods = {m["name"]: m for m in c.get("/api/modules").json()["modules"]}
+    assert mods["jellyfin"]["values"]["jfa_pass"] == {"set": True}
+
+
+def test_general_settings(tmp_path):
+    c, p, restarts = make(tmp_path)
+    assert c.put("/api/settings", json={"values": {"name": "homelab", "disk_alert_percent": 80}}).status_code == 200
+    assert load_config(str(p), {}).name == "homelab" and restarts == [1]
+    assert c.put("/api/settings", json={"values": {"disk_alert_percent": "mucho"}}).status_code == 400
+
+
+def test_busy_refuses(tmp_path):
+    c, p, restarts = make(tmp_path)
+    c.app.state.ctx.busy = lambda: "hay un backup en marcha"
+    r = c.put("/api/modules/raid", json={"enabled": True})
+    assert r.status_code == 409 and "backup" in r.json()["detail"] and restarts == []
+
+
+def test_requires_auth(tmp_path):
+    c, _, _ = make(tmp_path)
+    c.post("/api/logout")
+    c.cookies.clear()
+    assert c.get("/api/modules").status_code == 401
+    assert c.put("/api/settings", json={"values": {}}).status_code == 401

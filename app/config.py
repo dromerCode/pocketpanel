@@ -67,6 +67,7 @@ class Config:
     claude_cwd: str = ""
     jfa_user: str = ""
     jfa_pass: str = ""
+    config_path: str = ""
     extra: dict = field(default_factory=dict)
 
     def enabled(self, name: str) -> bool:
@@ -173,7 +174,20 @@ def load_config(path: str | None = None, env: Mapping | None = None) -> Config:
         claude_cwd=e("CLAUDE_CWD", "") or claude_home,
         jfa_user=jfa.get("jfa_user") or e("PANEL_JFA_USER", ""),
         jfa_pass=jfa.get("jfa_pass") or e("PANEL_JFA_PASS", ""),
+        config_path=str(path),
     )
+
+
+def saved_values(path: str, name: str) -> dict:
+    """Opciones de un módulo tal como están en config.yml (aunque esté apagado), con los valores por defecto."""
+    try:
+        raw = yaml.safe_load(Path(path).read_text()) or {}
+        given = ((raw.get("modules") or {}).get(name)) or {}
+    except (OSError, yaml.YAMLError, AttributeError):
+        given = {}
+    out = {k: v for k, v in copy.deepcopy(MODULE_DEFAULTS[name]).items() if k != "enabled"}
+    out.update({k: v for k, v in given.items() if k in out} if isinstance(given, dict) else {})
+    return out
 
 
 settings = load_config()

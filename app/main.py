@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os
+import signal
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -9,7 +11,11 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import auth, modules
-from .config import Config, settings
+from .catalog import CATALOG, GENERAL, secret_keys
+from .config import Config, ConfigError, saved_values, settings
+from .config_writer import apply_changes
+from .core import json_body
+from .secrets import load_secrets, save_secrets
 from .core import Context
 from .docker_api import DockerClient, DockerError
 from .history import HistoryDB
@@ -28,7 +34,13 @@ limiter = auth.LoginLimiter()
 RANGES = {"1h": (3600, 30), "24h": (86400, 600), "7d": (7 * 86400, 3600)}
 
 
-def create_app(cfg: Config) -> FastAPI:
+def _restart() -> None:
+    """Docker (restart: unless-stopped) vuelve a levantar el contenedor con la config nueva."""
+    asyncio.get_running_loop().call_later(0.5, os.kill, os.getpid(), signal.SIGTERM)
+
+
+def create_app(cfg: Config, restart=None) -> FastAPI:
+    restart = restart or _restart
     Path(cfg.data_dir).mkdir(parents=True, exist_ok=True)
     ctx = Context(cfg=cfg, ssh=SSH(cfg.ssh_host, cfg.ssh_user, cfg.ssh_key, cfg.known_hosts, cfg.ssh_port),
                   docker=DockerClient(cfg.docker_sock), push=PushService(cfg.data_dir, cfg.push_contact))
@@ -134,6 +146,56 @@ def create_app(cfg: Config) -> FastAPI:
     @app.post("/api/push/test", dependencies=authed)
     async def push_test():
         return {"sent": await ctx.push.send(cfg.name, "Así se verán los avisos 👍", "/#status")}
+
+    # ---------- Tienda de módulos ----------
+
+    def _module_view(name: str) -> dict:
+        values = saved_values(cfg.config_path, name)
+        secrets = load_secrets(cfg.data_dir).get(name, {})
+        for k in secret_keys(name):
+            values[k] = {"set": bool(secrets.get(k))}
+        return {"name": name, **CATALOG[name], "enabled": cfg.enabled(name), "values": values}
+
+    @app.get("/api/modules", dependencies=authed)
+    async def list_modules():
+        general = {f["key"]: getattr(cfg, f["key"]) for f in GENERAL}
+        return {"general": {"fields": GENERAL, "values": general},
+                "modules": [_module_view(m) for m in modules.MODULES]}
+
+    def _save(**kw) -> dict:
+        why = ctx.busy()
+        if why:
+            raise HTTPException(409, f"ahora no: {why}; prueba en un rato")
+        try:
+            apply_changes(cfg.config_path, {"PANEL_DATA": cfg.data_dir}, **kw)
+        except ConfigError as e:
+            raise HTTPException(400, str(e))
+        restart()
+        return {"restart": True}
+
+    @app.put("/api/modules/{name}", dependencies=authed)
+    async def save_module(name: str, request: Request):
+        if name not in CATALOG:
+            raise HTTPException(404, "módulo desconocido")
+        b = await json_body(request)
+        values = b.get("values") or {}
+        if not isinstance(values, dict):
+            raise HTTPException(400, "values no válido")
+        secret = {k: str(values.pop(k) or "") for k in list(values) if k in secret_keys(name)}
+        enabled = b.get("enabled")
+        if enabled is not None and not isinstance(enabled, bool):
+            raise HTTPException(400, "enabled tiene que ser true o false")
+        why = ctx.busy()
+        if why:
+            raise HTTPException(409, f"ahora no: {why}; prueba en un rato")
+        if secret:
+            save_secrets(cfg.data_dir, name, secret)
+        return _save(module=name, enabled=enabled, values=values)
+
+    @app.put("/api/settings", dependencies=authed)
+    async def save_settings(request: Request):
+        b = await json_body(request)
+        return _save(general=b.get("values") or {})
 
     @app.websocket("/ws/logs/{name}")
     async def ws_logs(ws: WebSocket, name: str):

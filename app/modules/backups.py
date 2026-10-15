@@ -25,7 +25,7 @@ class BackupHook:
 def setup(ctx) -> APIRouter:
     m = ctx.cfg.mod("backups")
     backup = ctx.backup = Backup(ctx.ssh, m, ctx.cfg.data_dir, ctx.tz, ctx.push)
-    restorer = Restorer(ctx.ssh, ctx.docker, backup, m, ctx.push)
+    restorer = ctx.restorer = Restorer(ctx.ssh, ctx.docker, backup, m, ctx.push)
     ctx.hooks.append(BackupHook(ctx, backup))
     ctx.info["backups"] = {"source": m["source"], "dest": m["dest"], "at": m["at"], "keep_days": m["keep_days"]}
     r = APIRouter(dependencies=[Depends(auth.require_auth)])

@@ -20,6 +20,19 @@ class Context:
     updater: object = None
     raid: object = None
     claude: object = None
+    restorer: object = None
+
+    def busy(self) -> str | None:
+        """Algo que un reinicio cortaría a medias (para no guardar ajustes mientras tanto)."""
+        if self.backup and self.backup.running:
+            return "hay un backup en marcha"
+        if self.updater and any(j.status == "running" for j in self.updater.jobs.values()):
+            return "hay una actualización en marcha"
+        if self.restorer and any(j.status == "running" for j in self.restorer.jobs.values()):
+            return "hay una restauración en marcha"
+        if self.claude and self.claude.running:
+            return "Claude está trabajando"
+        return None
 
     @property
     def tz(self) -> ZoneInfo:
