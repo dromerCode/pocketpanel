@@ -24,7 +24,8 @@ class QBit:
                                      headers={"Referer": self.url})
         except httpx.HTTPError as e:
             raise DownloadsError(f"qBittorrent no responde: {e}") from e
-        if r.text.strip() != "Ok.":
+        # v4/v5.0 responden 200 "Ok."; desde 5.1, 204 sin cuerpo (y 401 si falla)
+        if not (r.status_code == 204 or (r.status_code == 200 and r.text.strip() == "Ok.")):
             raise DownloadsError("qBittorrent rechazó el usuario o la contraseña")
         self._logged = True
 

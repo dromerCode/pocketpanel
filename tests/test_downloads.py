@@ -6,13 +6,15 @@ from app.downloads import Arr, DownloadsError, DownloadsWatcher, QBit
 H1 = "a" * 40
 
 
-def qbit_handler(v5=True, user_ok=True, log=None):
+def qbit_handler(v5=True, user_ok=True, log=None, new_login=False):
     def h(r):
         p = r.url.path
         if log is not None:
             log.append(p)
         if p == "/api/v2/auth/login":
             ok = b"username=admin" in r.content and user_ok
+            if new_login:  # qBittorrent 5.1+: 204 sin cuerpo si entra, 401 si no
+                return httpx.Response(204, headers={"set-cookie": "SID=abc; path=/"}) if ok else httpx.Response(401)
             return httpx.Response(200, text="Ok." if ok else "Fails.",
                                   headers={"set-cookie": "SID=abc; path=/"} if ok else {})
         if "SID=abc" not in r.headers.get("cookie", ""):
@@ -172,4 +174,15 @@ async def test_watcher_one_service_down_does_not_hide_others():
 async def test_missing_credentials_message():
     q = QBit("http://qb", "", "", http=httpx.AsyncClient(transport=httpx.MockTransport(qbit_handler())))
     with pytest.raises(DownloadsError, match="pide usuario y contraseña"):
+        await q.torrents()
+
+
+async def test_login_204_of_new_qbittorrent():
+    q, _ = qb(new_login=True)
+    assert len(await q.torrents()) == 2
+
+
+async def test_bad_login_401_of_new_qbittorrent():
+    q, _ = qb(new_login=True, user_ok=False)
+    with pytest.raises(DownloadsError, match="usuario"):
         await q.torrents()
