@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from .system import SYSTEM_SCRIPT, parse_system
+from ...system import SYSTEM_SCRIPT, parse_system
 
 log = logging.getLogger("pocketpanel.report")
 

@@ -1,8 +1,8 @@
 import os
 import time
 
-from app.actions import action_command, load_actions
-from app.uploads import clean_old, safe_name
+from app.modules.actions.actions import action_command, load_actions
+from app.modules.claude.uploads import clean_old, safe_name
 
 
 def test_load_actions_validates(tmp_path):

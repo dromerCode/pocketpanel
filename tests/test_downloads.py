@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from app.downloads import Arr, DownloadsError, DownloadsWatcher, QBit
+from app.modules.downloads.downloads import Arr, DownloadsError, DownloadsWatcher, QBit
 
 H1 = "a" * 40
 

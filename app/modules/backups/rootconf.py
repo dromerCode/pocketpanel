@@ -1,14 +1,14 @@
 """Genera /etc/pocketpanel/backup.conf para el modo root de los backups (lo usa install-root.sh).
 
-    python -m app.rootconf conf      → backup.conf
-    python -m app.rootconf excludes  → excludes.txt
-    python -m app.rootconf key       → ruta de la clave SSH del destino (vacía si no hay)
+    python -m app.modules.backups.rootconf conf      → backup.conf
+    python -m app.modules.backups.rootconf excludes  → excludes.txt
+    python -m app.modules.backups.rootconf key       → ruta de la clave SSH del destino (vacía si no hay)
 """
 import shlex
 import sys
 
 from .backup import backup_env
-from .config import load_config
+from ...config import load_config
 
 ROOT = "/etc/pocketpanel"
 

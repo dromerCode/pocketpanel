@@ -3,12 +3,12 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 
-from .. import auth
-from ..claude import ClaudeManager, ClaudePaths, SessionStore, SftpFS
-from ..monitor import due_daily
-from ..report import Report
-from ..ssh import RemoteClaude
-from ..uploads import MAX_BYTES, clean_old, safe_name
+from ... import auth
+from .claude import ClaudeManager, ClaudePaths, SessionStore, SftpFS
+from ...monitor import due_daily
+from .report import Report
+from ...ssh import RemoteClaude
+from .uploads import MAX_BYTES, clean_old, safe_name
 
 DIAGNOSIS = """Diagnóstico completo del servidor
 
@@ -53,6 +53,7 @@ def setup(ctx) -> APIRouter:
                                         permission_mode=m["permission_mode"], paths=paths)
     report = Report(ctx, claude, notes=m["report_notes"])
     ctx.hooks.append(ClaudeHook(ctx, report, cfg.uploads_dir))
+    ctx.busy_checks.append(lambda: "Claude está trabajando" if claude.running else None)
     ctx.info["claude"] = {"diagnosis": m["diagnosis"] or DIAGNOSIS, "report": bool(m["report_at"])}
 
     def finished(session, summary):

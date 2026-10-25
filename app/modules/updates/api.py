@@ -4,9 +4,9 @@ from datetime import datetime
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 
-from .. import auth
-from ..monitor import due_daily
-from ..updater import Updater
+from ... import auth
+from ...monitor import due_daily
+from .updater import Updater
 
 
 class UpdatesHook:
@@ -29,6 +29,8 @@ def setup(ctx) -> APIRouter:
     updater = ctx.updater = Updater(ctx.docker, httpx.AsyncClient(timeout=20, follow_redirects=True),
                                     backup=ctx.backup, push=ctx.push, data_dir=ctx.cfg.data_dir)
     ctx.hooks.append(UpdatesHook(ctx, updater))
+    ctx.busy_checks.append(lambda: "hay una actualización en marcha"
+                           if any(j.status == "running" for j in updater.jobs.values()) else None)
     r = APIRouter(dependencies=[Depends(auth.require_auth)])
 
     @r.get("/api/updates")

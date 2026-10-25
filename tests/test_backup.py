@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from app.backup import backup_env, parse_result, run_command, script, snapshot_name
+from app.modules.backups.backup import backup_env, parse_result, run_command, script, snapshot_name
 
 OPTS = {"source": "/srv/appdata", "dest": "bk@nas:/backups/pp", "ssh_key": "/home/r/.ssh/id_bk",
         "ssh_options": "-p 2222", "keep_days": 5, "excludes": ["cache/", "*.log"], "at": "04:00"}
@@ -60,7 +60,7 @@ def _run(cmd: str) -> str:
 
 @pytest.mark.skipif(not __import__("shutil").which("rsync"), reason="sin rsync")
 def test_backup_and_restore_for_real(tmp_path):
-    from app.restore import parse_preview, restore_command
+    from app.modules.backups.restore import parse_preview, restore_command
     src, dest = tmp_path / "appdata", tmp_path / "dest"
     (src / "app1" / "cache").mkdir(parents=True)
     (src / "app1" / "db.sqlite").write_text("v1")

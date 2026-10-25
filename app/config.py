@@ -8,6 +8,7 @@ from typing import Mapping
 
 import yaml
 
+from .modules import REGISTRY
 from .secrets import load_secrets
 
 
@@ -25,24 +26,8 @@ class ConfigError(Exception):
 
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
-# Valores por defecto de cada módulo. Los tres primeros vienen activados.
-MODULE_DEFAULTS: dict[str, dict] = {
-    "terminal": {"enabled": True},
-    "actions": {"enabled": True},
-    "updates": {"enabled": True, "check_at": "05:30"},
-    "claude": {"enabled": False, "home": "", "cwd": "", "bin": "", "permission_mode": "", "report_at": "09:00", "report_notes": "", "diagnosis": ""},
-    "backups": {"enabled": False, "source": "", "dest": "", "ssh_key": "", "ssh_options": "", "at": "04:00", "keep_days": 7,
-                "excludes": ["cache/", "Cache/", "logs/", "log/", "*.log", "transcodes/"]},
-    "raid": {"enabled": False, "device": "/dev/md0", "ssh": "", "ssh_options": "", "sudo": False},
-    "sites": {"enabled": False, "urls": [], "interval": 5, "cert_warn_days": 14},
-    "downloads": {"enabled": False, "qbittorrent_url": "", "sonarr_url": "", "radarr_url": "",
-                  "notify_finished": True},
-    "jellyfin": {"enabled": False, "jfa_url": "http://127.0.0.1:8056", "jellyfin_url": "http://127.0.0.1:8096",
-                 "public_url": "", "db": ""},
-}
-TIME_KEYS = {("updates", "check_at"), ("claude", "report_at"), ("backups", "at")}
-REQUIRED = {"backups": ("source", "dest")}
-CHOICES = {("claude", "permission_mode"): ("", "default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions")}
+# Valores por defecto de cada módulo, sacados de su manifiesto (app/modules/<nombre>/__init__.py)
+MODULE_DEFAULTS: dict[str, dict] = {name: m.defaults() for name, m in REGISTRY.items()}
 
 TOP_DEFAULTS = {"name": "servidor", "timezone": "Europe/Madrid", "disks": [], "disk_alert_percent": 90,
                 "host_env": {}, "push_contact": "mailto:admin@example.com", "services": {}}
@@ -109,19 +94,19 @@ def _modules(raw) -> dict:
         if not m["enabled"]:
             continue
         for k, v in m.items():
-            d = defaults[k]
-            if (name, k) in TIME_KEYS:
-                if v is None and (name, k) == ("claude", "report_at"):
+            f = REGISTRY[name].field(k)
+            if f and f["type"] == "time":
+                if v is None and f.get("nullable"):
                     continue
                 if not isinstance(v, str) or not TIME_RE.match(v):
                     raise ConfigError(f"modules.{name}.{k}: hora no válida (formato HH:MM)")
-            elif (name, k) in CHOICES and v not in CHOICES[(name, k)]:
-                raise ConfigError(f"modules.{name}.{k}: tiene que ser uno de {', '.join(c for c in CHOICES[(name, k)] if c)}")
-            elif type(d) is not type(v):
-                raise ConfigError(f"modules.{name}.{k}: tipo no válido (se esperaba {type(d).__name__})")
-        for k in REQUIRED.get(name, ()):
-            if not m[k]:
-                raise ConfigError(f"modules.{name}.{k}: obligatorio")
+            elif f and f["type"] == "choice" and v not in f["choices"]:
+                raise ConfigError(f"modules.{name}.{k}: tiene que ser uno de {', '.join(c for c in f['choices'] if c)}")
+            elif type(defaults[k]) is not type(v):
+                raise ConfigError(f"modules.{name}.{k}: tipo no válido (se esperaba {type(defaults[k]).__name__})")
+        for f in REGISTRY[name].fields:
+            if f.get("required") and not m[f["key"]]:
+                raise ConfigError(f"modules.{name}.{f['key']}: obligatorio")
         out[name] = m
     for name in raw:
         if name not in MODULE_DEFAULTS:

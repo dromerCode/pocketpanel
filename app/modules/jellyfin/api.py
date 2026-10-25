@@ -5,11 +5,11 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
-from .. import auth
-from ..core import json_body
-from ..jellyfin_meta import meta_command, parse_meta
-from ..jfa import Jfa
-from ..ssh import SSHError
+from ... import auth
+from ...core import json_body
+from .jellyfin_meta import meta_command, parse_meta
+from .jfa import Jfa
+from ...ssh import SSHError
 
 
 def setup(ctx) -> APIRouter:

@@ -5,7 +5,8 @@ import shlex
 import time
 from pathlib import Path
 
-UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+from ...core import UUID_RE
+
 MAX_OUTPUT = 8000
 
 
@@ -279,7 +280,7 @@ class SftpFS:
 
     async def _do(self, fn):
         from asyncssh import Error, SFTPNoSuchFile
-        from .ssh import SSHError
+        from ...ssh import SSHError
         try:
             async with (await self.ssh.conn()).start_sftp_client() as sftp:
                 return await fn(sftp)

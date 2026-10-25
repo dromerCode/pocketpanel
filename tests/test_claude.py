@@ -2,7 +2,7 @@ import asyncio
 import json
 import shlex
 
-from app.claude import ClaudeManager, build_cmd, normalize_stream, parse_session_file
+from app.modules.claude.claude import ClaudeManager, build_cmd, normalize_stream, parse_session_file
 
 
 def ev(**k):
@@ -175,7 +175,7 @@ async def test_manager_reports_failure_without_result():
 
 
 def test_term_command_modes():
-    from app.terminal import term_command
+    from app.modules.terminal.terminal import term_command
     assert term_command("shell", None, "/h", "/c", "/h/claude").endswith("bash -l")
     assert "tmux -u new-session -A -s claude" in term_command("tmux", None, "/h", "/c", "/h/claude")
     sid = "7f0c498a-d4fb-4620-87f7-16553d8453f6"
@@ -212,7 +212,7 @@ def test_build_cmd_uses_configured_bin():
 
 
 def test_term_tmux_runs_configured_bin():
-    from app.terminal import term_command
+    from app.modules.terminal.terminal import term_command
     cmd = term_command("tmux", None, "/home/u", "/srv", "/opt/claude")
     assert "/opt/claude" in cmd and "HOME=/home/u" in cmd
 

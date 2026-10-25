@@ -3,11 +3,11 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from .. import auth
-from ..backup import Backup
-from ..core import json_body
-from ..monitor import due_daily
-from ..restore import Restorer
+from ... import auth
+from .backup import Backup
+from ...core import json_body
+from ...monitor import due_daily
+from .restore import Restorer
 
 
 class BackupHook:
@@ -27,6 +27,9 @@ def setup(ctx) -> APIRouter:
     backup = ctx.backup = Backup(ctx.ssh, m, ctx.cfg.data_dir, ctx.tz, ctx.push)
     restorer = ctx.restorer = Restorer(ctx.ssh, ctx.docker, backup, m, ctx.push)
     ctx.hooks.append(BackupHook(ctx, backup))
+    ctx.busy_checks.append(lambda: "hay un backup en marcha" if backup.running else None)
+    ctx.busy_checks.append(lambda: "hay una restauración en marcha"
+                           if any(j.status == "running" for j in restorer.jobs.values()) else None)
     ctx.info["backups"] = {"source": m["source"], "dest": m["dest"], "at": m["at"], "keep_days": m["keep_days"]}
     r = APIRouter(dependencies=[Depends(auth.require_auth)])
 

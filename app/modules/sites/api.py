@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from .. import auth
-from ..sites import SiteMonitor
+from ... import auth
+from .sites import SiteMonitor
 
 
 def setup(ctx) -> APIRouter:

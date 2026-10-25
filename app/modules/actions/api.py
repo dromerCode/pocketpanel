@@ -2,10 +2,10 @@ import asyncio
 
 from fastapi import APIRouter, Depends, WebSocket
 
-from .. import auth
-from ..actions import action_command, load_actions
-from ..ssh import SSHError
-from ..wsutil import until_disconnect
+from ... import auth
+from .actions import action_command, load_actions
+from ...ssh import SSHError
+from ...wsutil import until_disconnect
 
 
 def setup(ctx) -> APIRouter:

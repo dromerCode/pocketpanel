@@ -1,6 +1,6 @@
 import pytest
 
-from app.registry import digest_matches, parse_ref, parse_www_authenticate
+from app.modules.updates.registry import digest_matches, parse_ref, parse_www_authenticate
 
 
 @pytest.mark.parametrize("ref,expected", [

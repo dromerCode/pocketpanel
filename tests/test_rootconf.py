@@ -1,6 +1,6 @@
 import subprocess
 
-from app.rootconf import render
+from app.modules.backups.rootconf import render
 
 OPTS = {"source": "/srv/appdata", "dest": "bk@nas:/backups/pp", "ssh_key": "/home/r/.ssh/id_bk",
         "ssh_options": "-p 2222", "keep_days": 5, "excludes": ["cache/", "*.log"]}

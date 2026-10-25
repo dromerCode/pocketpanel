@@ -2,9 +2,9 @@ import json
 
 from fastapi import APIRouter, WebSocket
 
-from .. import auth
-from ..ssh import SSHError
-from ..terminal import bridge, term_command
+from ... import auth
+from ...ssh import SSHError
+from .terminal import bridge, term_command
 
 
 def setup(ctx) -> APIRouter:

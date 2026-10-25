@@ -2,8 +2,10 @@ import time
 
 import httpx
 
+from ...core import UnavailableError
 
-class JfaError(Exception):
+
+class JfaError(UnavailableError):
     pass
 
 

@@ -4,7 +4,7 @@ import shlex
 
 from fastapi import WebSocket, WebSocketDisconnect
 
-from .claude import UUID_RE
+from ...core import UUID_RE
 
 
 # Sin esto, tmux y Claude pintan los acentos como "_" (la sesión SSH no trae locale)

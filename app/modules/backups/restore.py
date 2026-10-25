@@ -3,7 +3,7 @@ import re
 import shlex
 
 from .backup import backup_env, host_script
-from .updater import Job
+from ...jobs import Job
 
 SNAP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}(-[a-z0-9-]{1,40})?$")
 APP_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$")

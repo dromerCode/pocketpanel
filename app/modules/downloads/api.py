@@ -3,9 +3,9 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from .. import auth
-from ..downloads import Arr, DownloadsError, DownloadsWatcher, QBit
-from ..secrets import load_secrets
+from ... import auth
+from .downloads import Arr, DownloadsError, DownloadsWatcher, QBit
+from ...secrets import load_secrets
 
 HASH_RE = re.compile(r"^([0-9a-f]{40}|[0-9a-f]{64})$")
 

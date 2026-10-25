@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from app.sites import SiteMonitor, check_site, label
+from app.modules.sites.sites import SiteMonitor, check_site, label
 
 
 def client(handler):
@@ -126,11 +126,11 @@ def _tls_server(tmp_path, days):
 
 
 async def test_cert_days_real_tls(tmp_path):
-    from app.sites import cert_days
+    from app.modules.sites.sites import cert_days
     port = _tls_server(tmp_path, 30)
     assert await cert_days(f"https://127.0.0.1:{port}/") == 30
 
 
 async def test_cert_days_http_is_none():
-    from app.sites import cert_days
+    from app.modules.sites.sites import cert_days
     assert await cert_days("http://127.0.0.1:1/") is None

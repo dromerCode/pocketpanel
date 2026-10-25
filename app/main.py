@@ -19,10 +19,9 @@ from .config_writer import apply_changes
 from .core import json_body
 from .authstore import ensure_secret, save_pin
 from .secrets import load_secrets, save_secrets
-from .core import Context
+from .core import Context, UnavailableError
 from .docker_api import DockerClient, DockerError
 from .history import HistoryDB
-from .jfa import JfaError
 from .monitor import Monitor
 from .push import PushService
 from .ssh import SSH, SSHError
@@ -69,7 +68,7 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
 
     @app.exception_handler(SSHError)
     @app.exception_handler(DockerError)
-    @app.exception_handler(JfaError)
+    @app.exception_handler(UnavailableError)
     async def _unavailable(request, exc):
         return JSONResponse({"detail": str(exc)}, status_code=503)
 
@@ -304,6 +303,9 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
 
     for r in routers:
         app.include_router(r)
+    for name in modules.MODULES:  # la interfaz de cada módulo activo, que el navegador carga bajo demanda
+        if cfg.enabled(name) and (d := modules.web_dir(name)):
+            app.mount(f"/modules/{name}", StaticFiles(directory=d), name=f"module-{name}")
     app.mount("/", StaticFiles(directory=cfg.web_dir, html=True, check_dir=False), name="web")
     return app
 

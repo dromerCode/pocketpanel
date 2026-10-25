@@ -1,4 +1,4 @@
-from app.updater import build_create_body, split_image
+from app.modules.updates.updater import build_create_body, split_image
 
 IMAGE = {"Id": "sha256:old", "Config": {
     "Env": ["PATH=/usr/bin", "VERSION=1.0", "PUID=911"],
@@ -84,7 +84,7 @@ import asyncio  # noqa: E402
 
 import pytest  # noqa: E402
 
-from app import updater as U  # noqa: E402
+from app.modules.updates import updater as U  # noqa: E402
 
 
 class FakeDocker:
@@ -161,7 +161,7 @@ def test_refuses_self_update():
 
 
 async def test_check_marks_updates(monkeypatch):
-    import app.registry as R
+    import app.modules.updates.registry as R
 
     class D(FakeDocker):
         async def containers(self):
