@@ -8,7 +8,6 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
@@ -77,46 +76,14 @@
         <div id="charts" class="charts"></div>
 
         <div class="st-cols">
-          <div>
-            <div data-module="downloads">
-              <h2 class="section-title">Descargas</h2>
-              <a id="dl-card" class="card card-link dl-card" href="#downloads">
-                <span class="dl-speeds mono"><b id="dl-down">↓ –</b><span id="dl-up">↑ –</span></span>
-                <span id="dl-sub" class="card-sub">Cargando…</span>
-              </a>
-            </div>
-            <div data-module="raid">
-              <div class="section-head">
-                <h2 class="section-title">RAID</h2>
-                <span id="raid-badge" class="badge"></span>
-              </div>
-              <div id="raid" class="raid card"><span class="muted small">Cargando…</span></div>
-            </div>
-            <div data-module="backups">
-              <div class="section-head">
-                <h2 class="section-title">Backups</h2>
-                <span id="bk-badge" class="badge"></span>
-              </div>
-              <div id="backup" class="card bk"><span class="muted small">Cargando…</span></div>
-            </div>
-          </div>
+          <div id="st-slot-left"></div>
           <div>
             <h2 class="section-title">Discos</h2>
             <ul id="st-disks" class="disks"></ul>
-            <div data-module="sites">
-              <div class="section-head">
-                <h2 class="section-title">Webs</h2>
-                <button id="sites-check" class="btn btn-sm" title="Comprobar ahora">⟳</button>
-              </div>
-              <ul id="sites" class="sites card"><li class="muted small">Cargando…</li></ul>
-            </div>
+            <div id="st-slot-right"></div>
           </div>
         </div>
-
-        <div data-module="actions">
-          <h2 class="section-title">Acciones rápidas</h2>
-          <div id="actions" class="actions"></div>
-        </div>
+        <div id="st-slot-bottom"></div>
       </div>
     </section>
 
@@ -135,19 +102,6 @@
       </div>
     </section>
 
-    <!-- Descargas -->
-    <section id="view-downloads" class="view" data-view="downloads" hidden>
-      <header class="topbar">
-        <a href="#status" class="icon-btn" aria-label="Volver">←</a>
-        <h1>Descargas</h1>
-        <span id="dlv-speeds" class="muted mono small"></span>
-      </header>
-      <div class="scroll pad">
-        <div id="dlv-actions" class="btn-row"></div>
-        <div id="dlv-body"></div>
-      </div>
-    </section>
-
     <!-- Servicios -->
     <section id="view-services" class="view" data-view="services" hidden>
       <header class="topbar">
@@ -155,94 +109,19 @@
         <div class="seg" role="tablist">
           <button class="seg-btn active" data-filter="all">Todos</button>
           <button class="seg-btn" data-filter="down">Caídos</button>
-          <button class="seg-btn" data-filter="updates" data-module="updates">Actualizar</button>
         </div>
-        <button id="upd-check" data-module="updates" class="icon-btn" title="Buscar actualizaciones" aria-label="Buscar actualizaciones">⟳</button>
       </header>
       <div class="search-wrap">
         <input id="svc-search" type="search" placeholder="Buscar…" aria-label="Buscar servicio">
-        <div class="upd-row" data-module="updates">
-          <p id="upd-info" class="muted small upd-info"></p>
-          <button id="upd-all" class="btn btn-primary btn-sm" hidden>Actualizar todas</button>
-        </div>
       </div>
       <ul id="svc-list" class="svc-list scroll"></ul>
       <div class="pane-empty" id="svc-empty">Elige un servicio para ver sus logs</div>
     </section>
 
-    <!-- Terminal -->
-    <section id="view-terminal" class="view" data-view="terminal" hidden>
-      <header class="topbar">
-        <div class="seg">
-          <button class="seg-btn active" data-mode="shell">Shell</button>
-          <button class="seg-btn" data-mode="tmux" data-module="claude">tmux claude</button>
-        </div>
-        <span id="term-label" class="muted mono small"></span>
-        <button id="term-reconnect" class="icon-btn" title="Reconectar" aria-label="Reconectar">↻</button>
-      </header>
-      <div id="term" class="term"></div>
-      <div class="keys" id="term-keys">
-        <button data-k="esc">Esc</button><button data-k="tab">Tab</button><button data-k="ctrl" class="mod">Ctrl</button>
-        <button data-k="up">↑</button><button data-k="down">↓</button><button data-k="left">←</button><button data-k="right">→</button>
-        <button data-k="|">|</button><button data-k="~">~</button><button data-k="/">/</button><button data-k="-">-</button>
-      </div>
-    </section>
-
-    <!-- Claude -->
-    <section id="view-claude" class="view" data-view="claude" hidden>
-      <div id="cl-list-screen" class="cl-screen">
-        <header class="topbar">
-          <h1>Claude</h1>
-          <button id="cl-diag" class="btn btn-sm" title="Diagnóstico completo del servidor">🩺 Diagnóstico</button>
-          <button id="cl-report" class="icon-btn" title="Resumen del servidor ahora" aria-label="Resumen del servidor ahora">📋</button>
-          <button id="cl-new" class="btn btn-primary btn-sm">+ Nueva</button>
-        </header>
-        <ul id="cl-sessions" class="cl-sessions scroll"></ul>
-      </div>
-      <div id="cl-chat-screen" class="cl-screen" hidden>
-        <header class="topbar">
-          <button id="cl-back" class="icon-btn" aria-label="Volver">←</button>
-          <h1 id="cl-title" class="ellipsis">Nueva conversación</h1>
-          <button id="cl-term" class="icon-btn" title="Abrir en terminal" aria-label="Abrir en terminal">⌨</button>
-        </header>
-        <div id="cl-msgs" class="cl-msgs scroll"></div>
-        <div id="cl-files" class="cl-files" hidden></div>
-        <form id="cl-form" class="composer">
-          <label class="btn btn-ghost" for="cl-file" aria-label="Adjuntar archivo" title="Adjuntar">📎</label>
-          <input id="cl-file" type="file" multiple hidden>
-          <textarea id="cl-input" rows="1" placeholder="Escribe a Claude…" aria-label="Mensaje"></textarea>
-          <button id="cl-send" class="btn btn-primary" type="submit" aria-label="Enviar">➤</button>
-          <button id="cl-stop" class="btn btn-danger" type="button" hidden aria-label="Parar">■</button>
-        </form>
-      </div>
-      <div class="pane-empty" id="cl-empty">Elige una conversación o empieza una nueva</div>
-    </section>
-
-    <!-- Usuarios (jfa-go) -->
-    <section id="view-users" class="view" data-view="users" hidden>
-      <header class="topbar">
-        <h1>Usuarios</h1>
-        <div class="seg">
-          <button class="seg-btn active" data-utab="users">Cuentas</button>
-          <button class="seg-btn" data-utab="active">Activas</button>
-          <button class="seg-btn" data-utab="invites">Invitaciones</button>
-        </div>
-        <button id="u-new" class="btn btn-primary btn-sm">+ Nueva</button>
-      </header>
-      <div class="search-wrap">
-        <input id="u-search" type="search" placeholder="Buscar…" aria-label="Buscar usuario">
-        <p id="u-info" class="muted small upd-info"></p>
-      </div>
-      <ul id="u-list" class="svc-list scroll"></ul>
-      <div class="pane-empty">Elige un usuario o una invitación</div>
-    </section>
-
+    <!-- Aquí van las vistas de los módulos activos (web/js/registry.js) -->
     <nav class="tabbar">
       <a href="#status" data-tab="status"><span class="tab-ico">◉</span>Estado</a>
       <a href="#services" data-tab="services"><span class="tab-ico">▤</span>Servicios</a>
-      <a href="#terminal" data-tab="terminal" data-module="terminal"><span class="tab-ico">›_</span>Terminal</a>
-      <a href="#users" data-tab="users" data-module="jellyfin"><span class="tab-ico">☺</span>Usuarios</a>
-      <a href="#claude" data-tab="claude" data-module="claude"><span class="tab-ico">✳</span>Claude</a>
     </nav>
   </main>
 
@@ -259,10 +138,8 @@
       </header>
       <div class="sheet-actions">
         <a id="sh-open" class="btn btn-primary" target="_blank" rel="noopener">Abrir</a>
-        <button id="sh-update" class="btn btn-primary" hidden>Actualizar</button>
         <button id="sh-restart" class="btn">Reiniciar</button>
         <button id="sh-toggle" class="btn"></button>
-        <button id="sh-restore" class="btn" data-module="backups">Restaurar config…</button>
       </div>
       <div class="logs-head">
         <span class="section-title">Logs</span>
@@ -321,10 +198,6 @@
 
   <div id="toast" class="toast" hidden></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
   <script type="module" src="/js/main.js"></script>
 </body>
 </html>

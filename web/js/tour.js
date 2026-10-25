@@ -1,5 +1,5 @@
 // Tutorial: oscurece la pantalla y va iluminando cada parte con una explicación.
-import { has } from "./api.js";
+import { tourSteps } from "./registry.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -13,11 +13,9 @@ function steps() {
       action: ["Activar avisos", () => $("push-btn").click()] },
     { sel: 'a[href="#modules"]', title: "Módulos", text: "Aquí activas o configuras lo que quieras (backups, Claude, descargas…) y cambias el nombre del servidor. También puedes repetir este tutorial." },
     { sel: tab("services"), title: "Servicios", text: "Todos tus contenedores: arrancar, parar, reiniciar, ver logs y actualizarlos." },
-    { sel: tab("terminal"), module: "terminal", title: "Terminal", text: "Una shell en el servidor desde el móvil, con teclas extra (Esc, Ctrl, flechas…)." },
-    { sel: tab("users"), module: "jellyfin", title: "Usuarios", text: "Cuentas e invitaciones de Jellyfin." },
-    { sel: tab("claude"), module: "claude", title: "Claude", text: "Pregúntale a tu servidor qué le pasa. El botón 🩺 hace un diagnóstico completo." },
+    ...tourSteps(),  // los de los módulos activos, en el orden de sus pestañas
     { sel: null, title: "¡Ya está!", text: "Eso es todo. Si algún día te pierdes, lo tienes en ⚙ Módulos → «Ver el tutorial»." },
-  ].filter((s) => !s.module || has(s.module));
+  ];
 }
 
 let list = [], i = 0;

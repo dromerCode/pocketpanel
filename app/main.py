@@ -98,7 +98,8 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
     @app.get("/api/me", dependencies=authed)
     async def me():
         enabled = [m for m in modules.MODULES if cfg.enabled(m)]
-        return {"name": cfg.name, "modules": enabled, **{k: v for k, v in ctx.info.items() if k in enabled}}
+        return {"name": cfg.name, "modules": enabled, "ui": [m for m in enabled if modules.web_dir(m)],
+                **{k: v for k, v in ctx.info.items() if k in enabled}}
 
     @app.get("/api/system", dependencies=authed)
     async def system():

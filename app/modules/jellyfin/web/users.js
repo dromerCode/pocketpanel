@@ -1,5 +1,5 @@
-import { api, el, fmtAgo, panel, toast } from "./api.js";
-import { closeSheet, initSheet, openSheet as sheet } from "./ui.js";
+import { api, el, fmtAgo, panel, toast } from "/js/api.js";
+import { closeSheet, initSheet, openSheet as sheet } from "/js/ui.js";
 
 const $ = (id) => document.getElementById(id);
 let tab = "users";

@@ -1,4 +1,4 @@
-import { wsUrl } from "./api.js";
+import { wsUrl } from "/js/api.js";
 
 let term, fit, ws;
 let mode = "shell";

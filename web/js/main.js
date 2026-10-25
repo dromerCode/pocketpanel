@@ -1,17 +1,14 @@
 import { api, has, panel, setUnauthorizedHandler } from "./api.js";
 import * as status from "./status.js";
 import * as services from "./services.js";
-import * as terminal from "./terminal.js";
-import * as claude from "./claude.js";
-import * as users from "./users.js";
 import * as modulesView from "./modules.js";
-import * as downloads from "./downloads.js";
+import { loaded, loadModules, moduleViews } from "./registry.js";
 import { startSetup } from "./setup.js";
 import { startTour } from "./tour.js";
+import { initRunner } from "./ui.js";
 
-const views = { status, services, terminal, users, claude, modules: modulesView, downloads };
-const needs = { terminal: "terminal", users: "jellyfin", claude: "claude", downloads: "downloads" };  // vista → módulo
-const enabled = (v) => !needs[v] || has(needs[v]);
+// Las del núcleo; las de los módulos activos se añaden al arrancar (registry.js)
+const views = { status, services, modules: modulesView };
 let current = null;
 let started = false;
 
@@ -24,7 +21,7 @@ function showLogin() {
 function route() {
   if (location.hash === "#tour") return startTour();
   const name = (location.hash.slice(1).split("/")[0]) || "status";
-  const view = views[name] && enabled(name) ? name : "status";
+  const view = views[name] ? name : "status";
   if (current && current !== view) { views[current].hide?.(); views[current].leave?.(); }
   for (const s of document.querySelectorAll(".view")) s.hidden = s.dataset.view !== view;
   for (const a of document.querySelectorAll(".tabbar a")) a.classList.toggle("active", a.dataset.tab === view);
@@ -39,13 +36,18 @@ function applyModules(me) {
   for (const n of document.querySelectorAll("[data-module]")) n.hidden = !has(n.dataset.module);
 }
 
-function start(me) {
+async function start(me) {
   applyModules(me);
   document.getElementById("login").hidden = true;
   document.getElementById("app").hidden = false;
   if (!started) {
     started = true;
-    for (const [name, v] of Object.entries(views)) if (enabled(name)) v.init?.();
+    await loadModules(me.ui || []);
+    applyModules(me);  // lo que acaba de llegar con los módulos también lleva data-module
+    initRunner();
+    for (const v of Object.values(views)) v.init?.();
+    for (const m of loaded) m.def.init?.();  // su vista, o engancharse a otras (Servicios…)
+    Object.assign(views, moduleViews());
     window.addEventListener("hashchange", route);
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) views[current]?.hide?.();

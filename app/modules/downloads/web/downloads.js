@@ -1,5 +1,5 @@
 // Descargas: qBittorrent (pausar/reanudar) y la cola y los estrenos de Sonarr/Radarr.
-import { api, el, fmtBytes, toast } from "./api.js";
+import { api, el, fmtBytes, toast } from "/js/api.js";
 
 const $ = (id) => document.getElementById(id);
 let timer = null;

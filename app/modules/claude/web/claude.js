@@ -1,4 +1,4 @@
-import { api, el, fmtAgo, panel, toast, wsUrl } from "./api.js";
+import { api, el, fmtAgo, panel, toast, wsUrl } from "/js/api.js";
 
 const $ = (id) => document.getElementById(id);
 let ws = null;
@@ -16,10 +16,6 @@ let tools = {};
 let working = null;
 let files = [];            // adjuntos pendientes de enviar
 const ATTACH_RE = /\n*\[Archivos adjuntos para Claude:\n([\s\S]*?)\]\s*$/;
-
-DOMPurify.addHook("afterSanitizeAttributes", (n) => {
-  if (n.tagName === "A") { n.setAttribute("target", "_blank"); n.setAttribute("rel", "noopener"); }
-});
 
 /* ---------- WebSocket ---------- */
 
@@ -335,6 +331,10 @@ function autosize() {
 }
 
 export function init() {
+  // Aquí y no al importar: DOMPurify llega por un <script> que se carga junto al módulo (index.js)
+  DOMPurify.addHook("afterSanitizeAttributes", (n) => {
+    if (n.tagName === "A") { n.setAttribute("target", "_blank"); n.setAttribute("rel", "noopener"); }
+  });
   $("cl-new").onclick = newChat;
   $("cl-diag").onclick = () => {
     if (running) return toast("Claude está ocupado con otra cosa; prueba en un rato", true);

@@ -1,0 +1,16 @@
+<section id="view-terminal" class="view" data-view="terminal" hidden>
+  <header class="topbar">
+    <div class="seg">
+      <button class="seg-btn active" data-mode="shell">Shell</button>
+      <button class="seg-btn" data-mode="tmux" data-module="claude">tmux claude</button>
+    </div>
+    <span id="term-label" class="muted mono small"></span>
+    <button id="term-reconnect" class="icon-btn" title="Reconectar" aria-label="Reconectar">↻</button>
+  </header>
+  <div id="term" class="term"></div>
+  <div class="keys" id="term-keys">
+    <button data-k="esc">Esc</button><button data-k="tab">Tab</button><button data-k="ctrl" class="mod">Ctrl</button>
+    <button data-k="up">↑</button><button data-k="down">↓</button><button data-k="left">←</button><button data-k="right">→</button>
+    <button data-k="|">|</button><button data-k="~">~</button><button data-k="/">/</button><button data-k="-">-</button>
+  </div>
+</section>

@@ -1,34 +1,22 @@
-import { api, el, toast, wsUrl } from "./api.js";
+import { api, el, toast, wsUrl } from "/js/api.js";
+import { openRunner, runnerOut, setRunnerStatus } from "/js/ui.js";
 
 const $ = (id) => document.getElementById(id);
-let ws = null;
-
-function close() {
-  ws?.close();
-  ws = null;
-  $("runner").hidden = true;
-}
 
 function run(a) {
   if (a.confirm && !confirm(`¿Ejecutar "${a.name}"?\n\n${a.cmd}`)) return;
-  $("run-title").textContent = a.name;
-  $("run-status").textContent = "ejecutando…";
-  $("run-status").style.color = "";
-  $("run-out").textContent = `$ ${a.cmd}\n`;
-  $("runner").hidden = false;
-  ws = new WebSocket(wsUrl(`/ws/action/${a.id}`));
+  const ws = new WebSocket(wsUrl(`/ws/action/${a.id}`));
+  openRunner(a.name, "ejecutando…", () => ws.close());
+  runnerOut(`$ ${a.cmd}\n`);
   ws.onmessage = (e) => {
     let msg = null;
     if (e.data.startsWith("{")) { try { msg = JSON.parse(e.data); } catch { /* era salida normal */ } }
     if (msg && ("exit" in msg || "error" in msg)) {
       const ok = msg.exit === 0;
-      $("run-status").textContent = msg.error ? msg.error : ok ? "✓ terminado" : `✗ salió con código ${msg.exit}`;
-      $("run-status").style.color = ok ? "var(--accent)" : "var(--danger)";
+      setRunnerStatus(msg.error ? msg.error : ok ? "✓ terminado" : `✗ salió con código ${msg.exit}`, ok);
       return;
     }
-    const out = $("run-out");
-    out.textContent += e.data;
-    out.scrollTop = out.scrollHeight;
+    runnerOut(e.data, true);
   };
   ws.onclose = (e) => { if (e.code === 4401) location.reload(); };
 }
@@ -42,9 +30,4 @@ export async function loadActions() {
   } catch (e) {
     if (e.message !== "no autenticado") toast(`Acciones: ${e.message}`, true);
   }
-}
-
-export function initActions() {
-  $("run-close").onclick = close;
-  $("runner").addEventListener("click", (e) => { if (e.target.id === "runner") close(); });
 }

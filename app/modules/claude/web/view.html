@@ -1,0 +1,28 @@
+<section id="view-claude" class="view" data-view="claude" hidden>
+  <div id="cl-list-screen" class="cl-screen">
+    <header class="topbar">
+      <h1>Claude</h1>
+      <button id="cl-diag" class="btn btn-sm" title="Diagnóstico completo del servidor">🩺 Diagnóstico</button>
+      <button id="cl-report" class="icon-btn" title="Resumen del servidor ahora" aria-label="Resumen del servidor ahora">📋</button>
+      <button id="cl-new" class="btn btn-primary btn-sm">+ Nueva</button>
+    </header>
+    <ul id="cl-sessions" class="cl-sessions scroll"></ul>
+  </div>
+  <div id="cl-chat-screen" class="cl-screen" hidden>
+    <header class="topbar">
+      <button id="cl-back" class="icon-btn" aria-label="Volver">←</button>
+      <h1 id="cl-title" class="ellipsis">Nueva conversación</h1>
+      <button id="cl-term" class="icon-btn" title="Abrir en terminal" aria-label="Abrir en terminal">⌨</button>
+    </header>
+    <div id="cl-msgs" class="cl-msgs scroll"></div>
+    <div id="cl-files" class="cl-files" hidden></div>
+    <form id="cl-form" class="composer">
+      <label class="btn btn-ghost" for="cl-file" aria-label="Adjuntar archivo" title="Adjuntar">📎</label>
+      <input id="cl-file" type="file" multiple hidden>
+      <textarea id="cl-input" rows="1" placeholder="Escribe a Claude…" aria-label="Mensaje"></textarea>
+      <button id="cl-send" class="btn btn-primary" type="submit" aria-label="Enviar">➤</button>
+      <button id="cl-stop" class="btn btn-danger" type="button" hidden aria-label="Parar">■</button>
+    </form>
+  </div>
+  <div class="pane-empty" id="cl-empty">Elige una conversación o empieza una nueva</div>
+</section>

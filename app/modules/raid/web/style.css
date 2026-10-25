@@ -1,0 +1,9 @@
+.raid { gap: 10px; }
+.raid-disks { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 8px; }
+.raid-disk { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: center; padding-top: 8px; border-top: 1px solid var(--line); }
+.raid-disk .dev { font: 600 13px var(--mono); }
+.raid-disk .model { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.raid-disk .health { font-size: 12px; font-weight: 600; }
+.raid-disk .health.ok { color: var(--accent); }
+.raid-disk .health.bad { color: var(--danger); }
+.raid-disk .meta { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }

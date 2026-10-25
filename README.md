@@ -102,8 +102,9 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt pytest pytest-
 .venv/bin/pytest
 ```
 
-Backend in `app/` (`app/modules/` holds one file per optional module, registered only when enabled), frontend in
-`web/` (no build step).
+Backend in `app/`, frontend in `web/` (no build step). Each optional module is a self-contained folder in
+`app/modules/<name>/` (manifest, API, checks and its own interface) that is only loaded when enabled; adding a
+module means adding a folder. See [Writing a module](docs/modules.md).
 
 ---
 
