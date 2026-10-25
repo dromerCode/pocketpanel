@@ -87,10 +87,25 @@ sudo ./install-root.sh        # again after changing modules.backups; --remove t
 It copies `backup.sh` / `restore.sh` to `/etc/pocketpanel` (owned by root, source and destination fixed from your
 config) and adds a sudoers rule that lets your user run **only those two scripts** as root.
 
+## Without Tailscale
+
+Tailscale is optional. To reach the panel directly on a port of your server, add to `.env`:
+
+```sh
+PANEL_BIND=0.0.0.0   # or one IP of the server, e.g. its LAN address
+PANEL_PORT=9300
+```
+
+and run `docker compose up -d --force-recreate` (answer *n* if `./install.sh` offers `tailscale serve`).
+Open `http://<server>:9300`. Over plain HTTP everything works except push notifications and installing it as an
+app, which browsers only allow over HTTPS: put it behind your reverse proxy (NPM, Caddy, Traefik…, with
+WebSockets on) and set `PANEL_TRUSTED_PROXIES` to the proxy's IP (CIDR allowed, e.g. `172.16.0.0/12` for a
+proxy in Docker) so the panel sees the real client IP for the login limit.
+
 ## Security notes
 
-- The backend binds to `127.0.0.1` with host networking: it is not reachable from your LAN, only through
-  `tailscale serve` (or a reverse proxy you set up yourself).
+- By default the backend binds to `127.0.0.1` with host networking: it is not reachable from your LAN, only
+  through `tailscale serve` or a reverse proxy. `PANEL_BIND` changes that (see above).
 - Anyone with the PIN gets a shell as your user and access to the Docker socket, which is root-equivalent.
   Use a long PIN and keep it on your tailnet.
 - The panel's SSH key only works from `127.0.0.1`.
@@ -160,8 +175,11 @@ Si prefieres, todo sigue estando en `~/pocketpanel/config.yml` (comentado) para 
 - Cambiar el PIN: `./install.sh NUEVOPIN`
 - Actualizar a la última versión: `git pull && ./install.sh`
 - Si algo no va: `docker logs pocketpanel`
-- Ojo: con el PIN se puede usar la terminal y Docker de tu servidor. No lo compartas y no lo expongas fuera de
-  Tailscale.
+- Sin Tailscale: pon `PANEL_BIND=0.0.0.0` y `PANEL_PORT=<puerto>` en el `.env` y
+  `docker compose up -d --force-recreate`; se abre en `http://<servidor>:<puerto>`. Los avisos y la app
+  instalable necesitan HTTPS (ponlo detrás de tu proxy inverso). Detalles en *Without Tailscale*, arriba.
+- Ojo: con el PIN se puede usar la terminal y Docker de tu servidor. No lo compartas y no lo expongas a
+  internet.
 
 ## License
 
