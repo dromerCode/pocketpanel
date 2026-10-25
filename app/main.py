@@ -73,7 +73,10 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
         return JSONResponse({"detail": str(exc)}, status_code=503)
 
     def _ip(request: Request) -> str:
-        return request.headers.get("x-forwarded-for", "").split(",")[0].strip() or request.client.host
+        # Nunca X-Forwarded-For a pelo: cualquiera podría cambiarlo en cada intento y saltarse el límite del PIN.
+        # uvicorn (--proxy-headers) ya pone aquí la IP real cuando la petición llega de un proxy de confianza
+        # (PANEL_TRUSTED_PROXIES); si no, es la de quien se conecta.
+        return request.client.host
 
     @app.post("/api/login")
     async def login(request: Request, response: Response):
@@ -85,7 +88,7 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
             limiter.fail(ip)
             raise HTTPException(401, "PIN incorrecto")
         limiter.ok(ip)
-        https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+        https = request.url.scheme == "https"  # con un proxy de confianza, uvicorn ya lo ha puesto a https
         response.set_cookie(auth.COOKIE, auth.make_token(cfg.secret), max_age=auth.TOKEN_MAX_AGE,
                             httponly=True, samesite="strict", secure=https)
         return {"ok": True}
@@ -215,7 +218,7 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
                 save_secrets(cfg.data_dir, name, vals)
         cfg.pin_hash = save_pin(cfg.data_dir, pin)
         limiter.ok(_ip(request))
-        https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+        https = request.url.scheme == "https"  # con un proxy de confianza, uvicorn ya lo ha puesto a https
         response.set_cookie(auth.COOKIE, auth.make_token(cfg.secret), max_age=auth.TOKEN_MAX_AGE,
                             httponly=True, samesite="strict", secure=https)
         restart()
