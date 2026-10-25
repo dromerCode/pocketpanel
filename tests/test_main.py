@@ -36,6 +36,20 @@ def test_login_rate_limited(client):
     assert client.post("/api/login", json={"pin": "1234"}).status_code == 429
 
 
+def test_spoofed_forwarded_for_does_not_reset_limiter(client):
+    # Cambiar X-Forwarded-For en cada intento no puede dar intentos nuevos: con el panel en la LAN o en el
+    # tailnet, eso permitía probar todos los PIN. La IP real la pone uvicorn solo si viene de un proxy de confianza.
+    for i in range(5):
+        client.post("/api/login", json={"pin": "0000"}, headers={"X-Forwarded-For": f"10.0.0.{i}"})
+    r = client.post("/api/login", json={"pin": "1234"}, headers={"X-Forwarded-For": "10.0.0.99"})
+    assert r.status_code == 429
+
+
+def test_forwarded_proto_alone_does_not_mark_cookie_secure(client):
+    r = client.post("/api/login", json={"pin": "1234"}, headers={"X-Forwarded-Proto": "https"})
+    assert "secure" not in r.headers["set-cookie"].lower()
+
+
 def test_logout(client):
     login(client)
     client.post("/api/logout")

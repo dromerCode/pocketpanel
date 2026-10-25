@@ -2,7 +2,7 @@ import json
 from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
-from app.report import Report
+from app.modules.claude.report import Report
 
 
 class SSH:
@@ -78,7 +78,7 @@ async def test_finished_always_pushes(tmp_path):
 
 
 def test_extract_summary():
-    from app.report import extract_summary
+    from app.modules.claude.report import extract_summary
     t = "**Detalles**\n- todo en marcha\n\nRESUMEN: ✅ **Todo bien**.\nBackup ok, 14 actualizaciones pendientes."
     assert extract_summary(t) == "✅ Todo bien.\nBackup ok, 14 actualizaciones pendientes."
     assert extract_summary("párrafo uno\n\n⚠️ sin marcador") == "⚠️ sin marcador"

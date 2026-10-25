@@ -46,7 +46,7 @@ def test_me_lists_enabled_modules(tmp_path):
 def test_core_only(tmp_path):
     c = client(tmp_path, NONE)
     me = c.get("/api/me").json()
-    assert me == {"name": "casa-ramon", "modules": []}
+    assert me == {"name": "casa-ramon", "modules": [], "ui": []}
 
 
 @pytest.mark.parametrize("path", ["/api/raid", "/api/actions", "/api/backup", "/api/updates", "/api/report",

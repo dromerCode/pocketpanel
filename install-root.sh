@@ -20,14 +20,14 @@ if [ "${1:-}" = --remove ]; then
   exit 0
 fi
 
-pp() { docker compose run --rm --no-deps -T --entrypoint python pocketpanel -m app.rootconf "$1"; }
+pp() { docker compose run --rm --no-deps -T --entrypoint python pocketpanel -m app.modules.backups.rootconf "$1"; }
 conf=$(pp conf)
 excludes=$(pp excludes)
 key=$(pp key)
 key="${key/#\~/$USER_HOME}"
 
 install -d -m 755 -o root -g root "$DIR"
-install -m 755 -o root -g root app/scripts/backup.sh app/scripts/restore.sh "$DIR/"
+install -m 755 -o root -g root app/modules/backups/scripts/backup.sh app/modules/backups/scripts/restore.sh "$DIR/"
 printf '%s\n' "$conf" > "$DIR/backup.conf"
 printf '%s\n' "$excludes" > "$DIR/excludes.txt"
 chmod 644 "$DIR/backup.conf" "$DIR/excludes.txt"

@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from app.restore import Restorer, app_label, apps_from_mounts, parse_preview
+from app.modules.backups.restore import Restorer, app_label, apps_from_mounts, parse_preview
 
 OPTS = {"source": "/srv/appdata", "dest": "bk@nas:/backups", "ssh_key": "", "ssh_options": "", "keep_days": 7,
         "excludes": []}

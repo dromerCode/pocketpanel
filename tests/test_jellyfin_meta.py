@@ -1,4 +1,4 @@
-from app.jellyfin_meta import jfa_id, parse_meta
+from app.modules.jellyfin.jellyfin_meta import jfa_id, parse_meta
 
 
 def test_jfa_id():
@@ -21,6 +21,6 @@ def test_parse_meta():
 
 
 def test_meta_command_uses_configured_db():
-    from app.jellyfin_meta import meta_command
+    from app.modules.jellyfin.jellyfin_meta import meta_command
     c = meta_command("/srv/jf/data/jellyfin.db")
     assert "file:/srv/jf/data/jellyfin.db?mode=ro" in c

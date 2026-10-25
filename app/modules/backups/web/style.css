@@ -1,0 +1,4 @@
+.bk { gap: 8px; }
+.bk-row { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+.bk-row span:last-child { color: var(--muted); font-size: 12px; text-align: right; }
+.bk .btn { align-self: flex-start; margin-top: 4px; }

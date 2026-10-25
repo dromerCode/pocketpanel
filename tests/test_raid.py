@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from app.raid import parse_raid
+from app.modules.raid.raid import parse_raid
 
 OK = (Path(__file__).parent / "fixtures" / "raid_ok.txt").read_text()
 
@@ -99,7 +99,7 @@ def test_mdstat_only_rebuilding():
 
 
 def test_raid_command_local_and_remote():
-    from app.raid import raid_command
+    from app.modules.raid.raid import raid_command
     local = raid_command({"device": "/dev/md1", "ssh": "", "ssh_options": "", "sudo": True})
     assert "sudo -n mdadm --detail /dev/md1" in local and "ssh" not in local.split("\n")[0]
     remote = raid_command({"device": "/dev/md0", "ssh": "root@nas", "ssh_options": "-i ~/.ssh/k", "sudo": False})

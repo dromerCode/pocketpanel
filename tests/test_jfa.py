@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from app.jfa import Jfa, JfaError, expiry_state
+from app.modules.jellyfin.jfa import Jfa, JfaError, expiry_state
 
 
 def make(handler):

@@ -1,6 +1,6 @@
 import json
 
-from app.claude import ClaudePaths, SessionStore
+from app.modules.claude.claude import ClaudePaths, SessionStore
 
 SID = "7f0c498a-d4fb-4620-87f7-16553d8453f6"
 SID2 = "11111111-1111-4111-8111-111111111111"
@@ -91,7 +91,7 @@ async def test_sftp_errors_become_ssh_errors():
     import asyncssh
     import pytest
 
-    from app.claude import SftpFS
+    from app.modules.claude.claude import SftpFS
     from app.ssh import SSHError
 
     class Conn:

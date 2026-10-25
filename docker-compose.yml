@@ -5,7 +5,8 @@ services:
     image: pocketpanel:local
     container_name: pocketpanel
     restart: unless-stopped
-    # red del host + escucha solo en 127.0.0.1: desde la LAN no se ve; se publica con `tailscale serve`
+    # red del host; por defecto escucha solo en 127.0.0.1 (se publica con `tailscale serve`).
+    # Para abrirlo directamente en un puerto: PANEL_BIND=0.0.0.0 y PANEL_PORT=<puerto> en el .env
     network_mode: host
     user: "${PANEL_UID}:${PANEL_GID}"
     group_add: ["${DOCKER_GID}"]

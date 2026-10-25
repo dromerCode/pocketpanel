@@ -1,39 +1,43 @@
+import re
 from dataclasses import dataclass, field
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, Request
 
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+
+
+class UnavailableError(Exception):
+    """Un servicio del que depende un módulo no responde: la API contesta 503 con este mensaje."""
+
 
 @dataclass
 class Context:
-    """Lo que comparten el núcleo y los módulos. Los módulos rellenan lo suyo (backup, updater, raid, claude)."""
+    """Lo que comparten el núcleo y los módulos.
+
+    Cada módulo deja aquí lo que otros pueden usar (ctx.backup, ctx.updater, ctx.raid, ctx.claude…). Leer algo
+    que no ha dejado nadie da None: así un módulo sabe si otro está apagado sin importarlo."""
     cfg: object
     ssh: object
     docker: object
     push: object
     history: object = None
     monitor: object = None
-    hooks: list = field(default_factory=list)
+    hooks: list = field(default_factory=list)       # objetos con `async tick(n, now)`, ver Monitor
+    busy_checks: list = field(default_factory=list)  # funciones -> motivo para no reiniciar ahora, o None
     info: dict = field(default_factory=dict)  # extra de /api/me por módulo
     visible: dict = field(default_factory=dict)  # id(ws) → la app está en primer plano
-    backup: object = None
-    updater: object = None
-    raid: object = None
-    claude: object = None
-    restorer: object = None
-    claude_paths: object = None
-    downloads_qbit: object = None
+
+    def __getattr__(self, name):
+        if name.startswith("__"):
+            raise AttributeError(name)
+        return None
 
     def busy(self) -> str | None:
         """Algo que un reinicio cortaría a medias (para no guardar ajustes mientras tanto)."""
-        if self.backup and self.backup.running:
-            return "hay un backup en marcha"
-        if self.updater and any(j.status == "running" for j in self.updater.jobs.values()):
-            return "hay una actualización en marcha"
-        if self.restorer and any(j.status == "running" for j in self.restorer.jobs.values()):
-            return "hay una restauración en marcha"
-        if self.claude and self.claude.running:
-            return "Claude está trabajando"
+        for check in self.busy_checks:
+            if why := check():
+                return why
         return None
 
     @property
