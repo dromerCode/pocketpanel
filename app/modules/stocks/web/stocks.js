@@ -137,7 +137,7 @@ function watchCard(w) {
     if (!(v > 0)) { amount.focus(); toast("Escribe cuántos € has invertido", true); return; }
     if (!confirm(`¿Apunto la compra de ${w.ticker} por ${money(v)}?\n\nNo se ejecuta ninguna orden: hazla en tu bróker.`)) return;
     act(() => api(`/api/stocks/watchlist/${w.ticker}/buy`, { method: "POST", body: { invested_eur: v } }), `${w.ticker} a cartera`);
-  } }, "Pasar a cartera");
+  } }, "Comprar");
   const drop = el("button", { class: "btn btn-sm", "aria-label": `Dejar de seguir ${w.ticker}`, onclick: () => {
     if (confirm(`¿Dejar de seguir ${w.ticker}?`)) act(() => api(`/api/stocks/watchlist/${w.ticker}`, { method: "DELETE" }));
   } }, "✕");
