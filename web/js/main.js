@@ -1,4 +1,4 @@
-import { api, has, panel, setUnauthorizedHandler } from "./api.js";
+import { api, has, panel, setUnauthorizedHandler, toast } from "./api.js";
 import * as status from "./status.js";
 import * as services from "./services.js";
 import * as modulesView from "./modules.js";
@@ -47,6 +47,7 @@ async function start(me) {
     initRunner();
     for (const v of Object.values(views)) v.init?.();
     for (const m of loaded) m.def.init?.();  // su vista, o engancharse a otras (Servicios…)
+    if (me.deps_pending?.length) toast(`Descargando lo que necesita ${me.deps_pending.join(", ")}: aparecerá al terminar (Módulos)`);
     Object.assign(views, moduleViews());
     window.addEventListener("hashchange", route);
     document.addEventListener("visibilitychange", () => {

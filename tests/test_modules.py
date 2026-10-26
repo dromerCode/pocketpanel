@@ -4,6 +4,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from app import auth
 from app.config import load_config
+from app.deps import Deps
 from app.main import create_app
 from app.modules import MODULES
 
@@ -25,13 +26,22 @@ modules:
 """
 
 
-def client(tmp_path, yml):
+class ReadyDeps(Deps):
+    """Como si las dependencias de cada módulo ya estuvieran descargadas (en los tests vienen del venv)."""
+    def ready(self, name):
+        return True
+
+    def activate(self, name):
+        pass
+
+
+def client(tmp_path, yml, deps=None):
     p = tmp_path / "config.yml"
     p.write_text(yml)
     cfg = load_config(str(p), {"PANEL_PIN_HASH": auth.hash_pin("1234"), "PANEL_SECRET": "s",
                                "PANEL_DATA": str(tmp_path / "data"), "PANEL_UPLOADS": str(tmp_path / "up"),
                                "PANEL_HOST_DIR": "/opt/pocketpanel"})
-    c = TestClient(create_app(cfg))
+    c = TestClient(create_app(cfg, deps=deps or ReadyDeps(cfg.data_dir)))
     assert c.post("/api/login", json={"pin": "1234"}).status_code == 200
     return c
 
@@ -46,7 +56,7 @@ def test_me_lists_enabled_modules(tmp_path):
 def test_core_only(tmp_path):
     c = client(tmp_path, NONE)
     me = c.get("/api/me").json()
-    assert me == {"name": "casa-ramon", "modules": [], "ui": []}
+    assert me == {"name": "casa-ramon", "modules": [], "ui": [], "deps_pending": []}
 
 
 @pytest.mark.parametrize("path", ["/api/raid", "/api/actions", "/api/backup", "/api/updates", "/api/report",

@@ -23,6 +23,8 @@ class Context:
     push: object
     history: object = None
     monitor: object = None
+    deps: object = None                               # app.deps.Deps
+    deps_pending: list = field(default_factory=list)  # módulos activos que aún esperan sus dependencias
     hooks: list = field(default_factory=list)       # objetos con `async tick(n, now)`, ver Monitor
     busy_checks: list = field(default_factory=list)  # funciones -> motivo para no reiniciar ahora, o None
     info: dict = field(default_factory=dict)  # extra de /api/me por módulo

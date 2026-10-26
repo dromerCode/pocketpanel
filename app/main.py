@@ -20,6 +20,7 @@ from .core import json_body
 from .authstore import ensure_secret, save_pin
 from .secrets import load_secrets, save_secrets
 from .core import Context, UnavailableError
+from .deps import Deps
 from .docker_api import DockerClient, DockerError
 from .history import HistoryDB
 from .monitor import Monitor
@@ -44,7 +45,7 @@ def _restart() -> None:
 PIN_RE = re.compile(r"^\d{4,12}$")
 
 
-def create_app(cfg: Config, restart=None) -> FastAPI:
+def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
     restart = restart or _restart
     Path(cfg.data_dir).mkdir(parents=True, exist_ok=True)
     if not cfg.secret:
@@ -52,14 +53,38 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
     ctx = Context(cfg=cfg, ssh=SSH(cfg.ssh_host, cfg.ssh_user, cfg.ssh_key, cfg.known_hosts, cfg.ssh_port),
                   docker=DockerClient(cfg.docker_sock), push=PushService(cfg.data_dir, cfg.push_contact))
     ctx.history = HistoryDB(f"{cfg.data_dir}/history.db")
+    ctx.deps = deps or Deps(cfg.data_dir)
+    ctx.deps.prune([m for m in modules.MODULES if cfg.enabled(m)])
     routers = modules.load(ctx)
     ctx.monitor = Monitor(cfg, ctx.ssh, ctx.docker, ctx.history, ctx.push, hooks=ctx.hooks)
+    loaded = lambda m: cfg.enabled(m) and m not in ctx.deps_pending  # noqa: E731
+    installing: dict[str, asyncio.Task] = {}
+
+    async def install_deps(names: list[str]) -> None:
+        """Descarga lo que falte y reinicia para cargar los módulos (cuando nada impida reiniciar)."""
+        ok = True
+        for name in names:
+            ok = (await ctx.deps.install(name)).status == "ok" and ok
+        if not ok:
+            return
+        while ctx.busy():
+            await asyncio.sleep(10)
+        restart()
+
+    def start_install(names: list[str]) -> None:
+        names = [n for n in names if not (installing.get(n) and not installing[n].done())]
+        if names:
+            t = asyncio.create_task(install_deps(names))
+            installing.update({n: t for n in names})
 
     @asynccontextmanager
     async def lifespan(app):
         task = asyncio.create_task(ctx.monitor.run())
+        start_install(ctx.deps_pending)
         yield
         task.cancel()
+        for t in installing.values():
+            t.cancel()
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.cfg, app.state.ctx = cfg, ctx
@@ -100,9 +125,9 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
 
     @app.get("/api/me", dependencies=authed)
     async def me():
-        enabled = [m for m in modules.MODULES if cfg.enabled(m)]
+        enabled = [m for m in modules.MODULES if loaded(m)]
         return {"name": cfg.name, "modules": enabled, "ui": [m for m in enabled if modules.web_dir(m)],
-                **{k: v for k, v in ctx.info.items() if k in enabled}}
+                "deps_pending": ctx.deps_pending, **{k: v for k, v in ctx.info.items() if k in enabled}}
 
     @app.get("/api/system", dependencies=authed)
     async def system():
@@ -231,7 +256,8 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
         secrets = load_secrets(cfg.data_dir).get(name, {})
         for k in secret_keys(name):
             values[k] = {"set": bool(secrets.get(k))}
-        return {"name": name, **CATALOG[name], "enabled": cfg.enabled(name), "values": values}
+        return {"name": name, **CATALOG[name], "enabled": cfg.enabled(name), "values": values,
+                "deps": ctx.deps.view(name)}
 
     @app.get("/api/modules", dependencies=authed)
     async def list_modules():
@@ -282,6 +308,20 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
             values.setdefault("jfa_pass", cfg.jfa_pass)
         return await check_module(name, values, ctx.ssh)
 
+    @app.get("/api/deps/{name}", dependencies=authed)
+    async def deps_job(name: str):
+        job = ctx.deps.jobs.get(name)
+        if not job:
+            raise HTTPException(404, "no hay ninguna descarga de ese módulo")
+        return job.view()
+
+    @app.post("/api/deps/{name}/retry", dependencies=authed)
+    async def deps_retry(name: str):
+        if name not in ctx.deps_pending:
+            raise HTTPException(409, "ese módulo no está esperando dependencias")
+        start_install([name])
+        return {"ok": True}
+
     @app.put("/api/settings", dependencies=authed)
     async def save_settings(request: Request):
         b = await json_body(request)
@@ -308,7 +348,7 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
     for r in routers:
         app.include_router(r)
     for name in modules.MODULES:  # la interfaz de cada módulo activo, que el navegador carga bajo demanda
-        if cfg.enabled(name) and (d := modules.web_dir(name)):
+        if loaded(name) and (d := modules.web_dir(name)):
             app.mount(f"/modules/{name}", StaticFiles(directory=d), name=f"module-{name}")
     app.mount("/", StaticFiles(directory=cfg.web_dir, html=True, check_dir=False), name="web")
     return app

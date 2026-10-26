@@ -9,6 +9,7 @@ app/modules/weather/
 ├── __init__.py      manifest: what the module store shows and its options (always imported: keep it light)
 ├── api.py           setup(ctx) -> APIRouter (imported only when the module is on)
 ├── checks.py        optional: requirement checks for the "Comprobar requisitos" button
+├── requirements.txt optional: Python packages only this module needs (see below)
 ├── weather.py       your own logic, as many files as you like
 └── web/             optional: its part of the interface, served at /modules/weather/
     ├── index.js     what it adds to the app (see below)
@@ -65,6 +66,21 @@ What the core offers in `ctx`: `cfg`, `ssh` (run commands on the host), `docker`
 - put data for the interface in `ctx.info["weather"]` (it arrives in `/api/me`, readable as `panel.weather`);
 - leave an object for other modules (`ctx.backup = …`). Reading something no module left gives `None`, so
   `if ctx.backup:` is how a module checks whether another one is on.
+
+## Its own Python packages (`requirements.txt`)
+
+What only one module needs doesn't go in the image. List it, pinned, in the module's `requirements.txt`:
+
+```
+curl_cffi==0.16.3
+```
+
+When the module is switched on, the panel starts without it, downloads the packages in the background into
+`data/deps/<module>-<fingerprint>/` (with `pip --prefix`, so whatever the image already has is not downloaded
+again), and restarts itself to load the module; the module store shows the progress and lets you retry if it
+fails. It happens once: the folder survives restarts and image updates. Switching the module off, or changing the
+versions, removes the old folder on the next start. Import the packages inside the module's code as usual, but not
+in its `__init__.py` (the manifest is read even when the module is off).
 
 ## Requirement checks (`checks.py`)
 
