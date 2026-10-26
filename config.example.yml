@@ -64,6 +64,16 @@ modules:
     radarr_url: ""             # http://127.0.0.1:7878
     notify_finished: true      # aviso push cuando termina una descarga
 
+  stocks:                      # cartera de bolsa: recomendaciones por reglas, seguimiento y avisos por Telegram
+    enabled: false             # al activarlo descarga curl_cffi (~38 MB, en data/deps); al apagarlo se borra
+    broker: Trade Republic
+    max_positions: 3
+    commission: "1"            # € por operación: se descuenta del efectivo
+    alerts: true               # avisar cuando cambie una recomendación
+    alert_every: 30            # minutos
+    digest_at: "07:00"         # resumen diario por Telegram (null: sin resumen)
+    telegram_chat: ""          # el token del bot se pone desde la app (se guarda aparte, en data/)
+
   jellyfin:                    # cuentas e invitaciones de Jellyfin a través de jfa-go
     enabled: false             # usuario/contraseña de jfa-go: desde la app (se guardan aparte, en data/)
     jfa_url: http://127.0.0.1:8056

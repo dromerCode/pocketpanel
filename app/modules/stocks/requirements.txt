@@ -1,0 +1,2 @@
+# Solo esto: habla con Yahoo como un Chrome (sin yfinance, pandas ni numpy)
+curl_cffi==0.16.3
