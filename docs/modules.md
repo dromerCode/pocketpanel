@@ -120,8 +120,12 @@ export default {
 };
 ```
 
-- **Cards** go into a slot of the status screen (`left`, `right` or `bottom`). `init` runs once, `show` when
-  the status screen opens, `fast` every 5 s and `slow` every 30 s while it is visible.
+- **Cards** are widgets on the status screen. `slot` (`left`: after the history, `right`: after the disks,
+  `bottom`: at the end) and `order` only say where a card shows up the first time, and `size` its width in a
+  12-column grid (3, 4, 6, 8 or 12; 6 by default, 12 for `bottom`). After that the user moves, resizes and hides
+  them with ✎ (stored in `data/layout.json`, the same on every device). The title in the organizer is `title`, or
+  the card's first `.section-title`. `init` runs once, `show` when the status screen opens, `fast` every 5 s and
+  `slow` every 30 s while it is visible.
 - **A view** is an HTML fragment with a `<section class="view" data-view="<name>" hidden>`; with `tab` it also gets
   a button in the tab bar. It is reachable at `#<name>` (the module name, or `view.name`).
 - **Hooking into other screens**: `/js/services.js` exports `addFilter`, `addHeader`, `addInfo`,

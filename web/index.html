@@ -55,35 +55,39 @@
       <header class="topbar">
         <h1 class="srv-name">servidor</h1>
         <span id="st-uptime" class="muted mono small"></span>
+        <button id="st-edit" class="icon-btn" title="Organizar" aria-label="Organizar los widgets">✎</button>
         <button id="push-btn" class="icon-btn" title="Avisos" aria-label="Avisos">🔕</button>
         <a href="#modules" class="icon-btn" title="Módulos y ajustes" aria-label="Módulos y ajustes">⚙</a>
       </header>
       <div class="scroll pad">
-        <div class="cards">
-          <div class="card"><span class="card-label">CPU</span><span id="st-cpu" class="card-value mono">–</span><span id="st-load" class="card-sub mono"></span></div>
-          <div class="card"><span class="card-label">RAM</span><span id="st-mem" class="card-value mono">–</span><span id="st-mem-sub" class="card-sub mono"></span></div>
-          <div class="card"><span class="card-label">Temperatura</span><span id="st-temp" class="card-value mono">–</span><span class="card-sub">CPU</span></div>
-          <a class="card card-link" id="st-containers" href="#services"><span class="card-label">Contenedores</span><span id="st-up" class="card-value mono">–</span><span id="st-down" class="card-sub"></span></a>
+        <div id="st-editbar" class="wbar" hidden>
+          <span class="muted small">Arrastra <b>⠿</b> para mover, <b>−</b> <b>+</b> para el ancho y <b>✕</b> para ocultar.</span>
+          <button id="st-reset" class="btn btn-sm" type="button">Restablecer</button>
+          <button id="st-done" class="btn btn-sm btn-primary" type="button">Listo</button>
         </div>
-        <div class="section-head">
-          <h2 class="section-title">Historial</h2>
-          <div class="seg" id="hist-range">
-            <button class="seg-btn active" data-range="1h">1 h</button>
-            <button class="seg-btn" data-range="24h">24 h</button>
-            <button class="seg-btn" data-range="7d">7 d</button>
+        <!-- Los widgets: los del núcleo y las tarjetas de los módulos (registry.js); el orden y el ancho los pone widgets.js -->
+        <div id="st-grid" class="wgrid">
+          <div class="w" data-w="cpu" data-title="CPU" data-size="3" data-rank="10"><div class="card"><span class="card-label">CPU</span><span id="st-cpu" class="card-value mono">–</span><span id="st-load" class="card-sub mono"></span></div></div>
+          <div class="w" data-w="ram" data-title="RAM" data-size="3" data-rank="11"><div class="card"><span class="card-label">RAM</span><span id="st-mem" class="card-value mono">–</span><span id="st-mem-sub" class="card-sub mono"></span></div></div>
+          <div class="w" data-w="temp" data-title="Temperatura" data-size="3" data-rank="12"><div class="card"><span class="card-label">Temperatura</span><span id="st-temp" class="card-value mono">–</span><span class="card-sub">CPU</span></div></div>
+          <div class="w" data-w="containers" data-title="Contenedores" data-size="3" data-rank="13"><a class="card card-link" id="st-containers" href="#services"><span class="card-label">Contenedores</span><span id="st-up" class="card-value mono">–</span><span id="st-down" class="card-sub"></span></a></div>
+          <div class="w" data-w="history" data-title="Historial" data-size="12" data-rank="20">
+            <div class="section-head">
+              <h2 class="section-title">Historial</h2>
+              <div class="seg" id="hist-range">
+                <button class="seg-btn active" data-range="1h">1 h</button>
+                <button class="seg-btn" data-range="24h">24 h</button>
+                <button class="seg-btn" data-range="7d">7 d</button>
+              </div>
+            </div>
+            <div id="charts" class="charts"></div>
           </div>
-        </div>
-        <div id="charts" class="charts"></div>
-
-        <div class="st-cols">
-          <div id="st-slot-left"></div>
-          <div>
+          <div class="w" data-w="disks" data-title="Discos" data-size="6" data-rank="50">
             <h2 class="section-title">Discos</h2>
             <ul id="st-disks" class="disks"></ul>
-            <div id="st-slot-right"></div>
           </div>
         </div>
-        <div id="st-slot-bottom"></div>
+        <div id="st-hidden" class="wtray" hidden></div>
       </div>
     </section>
 

@@ -5,12 +5,19 @@
 //   scripts: ["https://cdn…/lib.js"]          <script> clásicos que necesita, en orden (xterm, marked…)
 //   view:    { html: "view.html", name?, tab?: { icon, label, order? } }
 //            una vista en #<name> (por defecto, el nombre del módulo); con `tab`, además, sale en la barra
-//   cards:   [{ slot: "left" | "right" | "bottom", html: "card.html", order?, init?, show?, fast?, slow? }]
-//            tarjetas en Estado: init una vez, show al entrar, fast cada 5 s y slow cada 30 s
+//   cards:   [{ slot: "left" | "right" | "bottom", html: "card.html", order?, size?, title?, init?, show?, fast?, slow? }]
+//            widgets en Estado: init una vez, show al entrar, fast cada 5 s y slow cada 30 s. `slot` y `order`
+//            dicen dónde salen la primera vez y `size` su ancho (3, 4, 6, 8 o 12 de 12 columnas); luego cada
+//            cual los mueve y los ensancha desde «Organizar» (widgets.js)
 //   tour:    [{ sel, title, text }]            sus pasos del tutorial
 //   init()                                     una vez al arrancar (p. ej. para engancharse a Servicios)
 //   show(args) / hide() / leave()              el ciclo de su vista, como las del núcleo
 import { toast } from "./api.js";
+
+// Dónde cae por defecto cada tarjeta en Estado según su `slot` (el usuario luego la mueve y la ensancha a su gusto):
+// left = tras el historial, right = tras los discos, bottom = al final a lo ancho
+const SLOT_RANK = { left: 30, right: 60, bottom: 90 };
+const SLOT_SIZE = { left: 6, right: 6, bottom: 12 };
 
 export const loaded = [];   // [{ name, def, base, order }] en el orden de la tienda
 const scripts = new Map();  // url → promesa: cada librería se carga una vez aunque la pidan dos módulos
@@ -59,13 +66,17 @@ function mount(m) {
   const { def, html } = m;
   if (html.view) document.querySelector("#app > nav.tabbar").before(html.view);
   (def.cards || []).forEach((c, i) => {
-    const slot = document.getElementById(`st-slot-${c.slot || "bottom"}`);
+    const grid = document.getElementById("st-grid");
     const box = document.createElement("div");
-    box.dataset.order = c.order ?? m.order;
-    box.dataset.card = m.name;
+    const slot = c.slot || "bottom";
+    box.className = "w";
+    box.dataset.w = def.cards.length > 1 ? `${m.name}-${i + 1}` : m.name;
+    box.dataset.size = c.size ?? SLOT_SIZE[slot];
+    box.dataset.rank = SLOT_RANK[slot] + Number(c.order ?? m.order) / 1000;
     if (html.cards[i]) box.append(html.cards[i]);
-    const after = [...slot.children].find((x) => Number(x.dataset.order) > Number(box.dataset.order));
-    slot.insertBefore(box, after || null);
+    box.dataset.title = c.title || box.querySelector(".section-title")?.textContent.trim() || m.name;
+    const after = [...grid.children].find((x) => Number(x.dataset.rank) > Number(box.dataset.rank));
+    grid.insertBefore(box, after || null);
   });
   const tab = def.view?.tab;
   if (tab) {

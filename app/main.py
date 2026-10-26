@@ -23,6 +23,7 @@ from .core import Context, UnavailableError
 from .deps import Deps
 from .docker_api import DockerClient, DockerError
 from .history import HistoryDB
+from .layout import LayoutError, load_layout, save_layout
 from .monitor import Monitor
 from .push import PushService
 from .ssh import SSH, SSHError
@@ -161,6 +162,17 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
     async def get_history(range: str = "1h"):
         span, bucket = RANGES.get(range, RANGES["1h"])
         return ctx.history.query(since=int(time.time()) - span, bucket=bucket)
+
+    @app.get("/api/layout", dependencies=authed)
+    async def get_layout():
+        return load_layout(cfg.data_dir)
+
+    @app.put("/api/layout", dependencies=authed)
+    async def put_layout(request: Request):
+        try:
+            return save_layout(cfg.data_dir, (await json_body(request)).get("status"))
+        except LayoutError as e:
+            raise HTTPException(400, str(e))
 
     @app.get("/api/push/key", dependencies=authed)
     async def push_key():

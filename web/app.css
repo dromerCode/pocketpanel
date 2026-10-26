@@ -108,7 +108,28 @@ a { color: inherit; }
 .seg-btn.active { background: var(--surface-2); color: var(--text); }
 
 /* Estado */
-.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* Widgets: 4 columnas en el móvil (los estrechos van de dos en dos) y 12 en el PC; ver js/widgets.js */
+.wgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
+.w { grid-column: span 4; display: flex; flex-direction: column; min-width: 0; position: relative; container-type: inline-size; }
+.w[data-cur="3"], .w[data-cur="4"] { grid-column: span 2; }
+.w > .card { flex: 1; }
+.w > .section-title:first-child, .w > .section-head:first-child { margin-top: 4px; }
+.w > .section-title + * { flex: 1; }
+.w > .section-title:first-child { margin-bottom: 10px; }
+.wbar { position: sticky; top: -16px; z-index: 3; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -16px -16px 12px; padding: 10px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.wbar > span { flex: 1 1 220px; }
+.wtray { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding: 12px; border: 1px dashed var(--line); border-radius: var(--radius); }
+.wgrid.editing .w { outline: 1px dashed var(--line); outline-offset: 4px; border-radius: var(--radius); }
+.wgrid.editing .w > :not(.wtools) { opacity: .55; }
+.wgrid.editing .w > .section-title, .wgrid.editing .w > .section-head > .section-title { display: none; }
+.wgrid.editing .w > .section-head { justify-content: flex-end; margin-top: 0; }
+.wgrid .w.dragging { outline: 2px solid var(--accent); }
+.wgrid .w.dragging > :not(.wtools) { opacity: .3; }
+.wtools { display: flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.wname { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wtool { width: 30px; height: 30px; flex: none; display: grid; place-items: center; padding: 0; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; font-size: 15px; }
+.whandle { cursor: grab; touch-action: none; }
+.w.dragging .whandle { cursor: grabbing; }
 .card {
   display: flex; flex-direction: column; gap: 2px;
   padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
@@ -193,6 +214,7 @@ a { color: inherit; }
 
 /* Gráficas */
 .charts { display: grid; gap: 10px; }
+@container (min-width: 640px) { .charts { grid-template-columns: repeat(3, 1fr); } }
 .chart { position: relative; padding: 12px 12px 8px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .chart-title { font-size: 13px; font-weight: 600; }
@@ -220,7 +242,6 @@ a { color: inherit; }
 #run-out { margin-top: 4px; }
 
 .pane-empty { display: none; }
-.st-cols { display: grid; gap: 0 20px; }
 
 /* Tablet en vertical: columna centrada como en el móvil */
 @media (min-width: 720px) and (max-width: 899px) {
@@ -247,9 +268,8 @@ a { color: inherit; }
 
   /* Estado */
   #view-status .pad { padding: 20px 28px 28px; max-width: 1400px; width: 100%; margin: 0 auto; }
-  .cards { grid-template-columns: repeat(4, 1fr); }
-  .charts { grid-template-columns: repeat(3, 1fr); }
-  .st-cols { grid-template-columns: 1fr 1fr; align-items: start; }
+  .wgrid { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
+  .w, .w[data-cur="3"], .w[data-cur="4"] { grid-column: span var(--span, 6); }
 
   /* Servicios: lista + ficha al lado */
   #view-services { display: grid; grid-template-columns: var(--list-w) 1fr; grid-template-rows: auto auto 1fr; }
