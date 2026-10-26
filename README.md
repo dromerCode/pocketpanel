@@ -35,6 +35,7 @@ Optional modules, turned on and configured from the app itself (**Status → ⚙
 | `claude` | Chat with [Claude Code](https://claude.com/claude-code) running on the server, attach files, daily health report by push | `claude` installed and logged in |
 | `backups` | Nightly incremental backups (rsync + hardlinks) of a folder to another machine over SSH, restore one app's folder from the container sheet | `rsync` on both ends |
 | `raid` | mdadm RAID state + SMART (local or on another box over SSH) | `mdadm`, `smartctl` |
+| `files` | Lightweight file manager over SFTP (the same SSH connection): browse, multi-select, copy/cut and paste between folders, rename, delete, upload (drag and drop), download (folders as `.tar`), preview images/video/audio/PDF and edit text files. Limited to the folders you list | – |
 | `sites` | Checks that your websites answer and how many days their TLS certificate has left; push alert when one goes down, comes back or is about to expire | – |
 | `downloads` | qBittorrent (pause/resume, speeds, ETA), Sonarr/Radarr queue and what airs in the next 7 days; push when a download finishes or *arr reports a problem | qBittorrent / Sonarr / Radarr |
 | `jellyfin` | Manage Jellyfin accounts and invites through [jfa-go](https://github.com/hrfee/jfa-go) | jfa-go |

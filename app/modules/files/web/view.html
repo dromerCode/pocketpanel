@@ -1,0 +1,54 @@
+<section id="view-files" class="view" data-view="files" hidden>
+  <header class="topbar">
+    <h1>Archivos</h1>
+    <select id="fm-root" class="fm-root" aria-label="Carpeta de inicio"></select>
+    <button id="fm-new" class="icon-btn" title="Nuevo" aria-label="Nueva carpeta o archivo">+</button>
+    <button id="fm-upload-btn" class="icon-btn" title="Subir archivos" aria-label="Subir archivos">⇪</button>
+    <input id="fm-upload" type="file" multiple hidden>
+  </header>
+  <div class="fm-bar">
+    <button id="fm-up" class="icon-btn" title="Carpeta de arriba" aria-label="Carpeta de arriba">↰</button>
+    <nav id="fm-crumbs" class="fm-crumbs" aria-label="Ruta"></nav>
+    <input id="fm-filter" class="fm-filter" type="search" placeholder="Filtrar" aria-label="Filtrar esta carpeta" autocomplete="off">
+  </div>
+  <div id="fm-wrap" class="fm-wrap scroll">
+    <ul id="fm-list" class="fm-list" role="listbox" aria-multiselectable="true"></ul>
+  </div>
+  <div id="fm-progress" class="fm-progress" hidden>
+    <span id="fm-progress-text" class="small"></span>
+    <i><b id="fm-progress-bar"></b></i>
+    <button id="fm-progress-log" class="btn btn-sm" type="button">Ver</button>
+  </div>
+  <div id="fm-selbar" class="fm-actions" hidden>
+    <button id="fm-sel-clear" class="icon-btn" type="button" aria-label="Quitar la selección">✕</button>
+    <span id="fm-sel-count" class="fm-count"></span>
+    <button class="btn btn-sm" type="button" data-act="copy">Copiar</button>
+    <button class="btn btn-sm" type="button" data-act="cut">Cortar</button>
+    <button class="btn btn-sm" type="button" data-act="rename">Renombrar</button>
+    <button class="btn btn-sm" type="button" data-act="download">Descargar</button>
+    <button class="btn btn-sm fm-danger" type="button" data-act="delete">Borrar</button>
+  </div>
+  <div id="fm-clipbar" class="fm-actions" hidden>
+    <button id="fm-clip-clear" class="icon-btn" type="button" aria-label="Vaciar el portapapeles">✕</button>
+    <span id="fm-clip-text" class="fm-count"></span>
+    <button id="fm-paste" class="btn btn-sm btn-primary" type="button">Pegar aquí</button>
+  </div>
+  <footer id="fm-foot" class="fm-foot muted small">
+    <span id="fm-info"></span>
+    <label class="fm-hidden"><input id="fm-show-hidden" type="checkbox"> Ocultos</label>
+  </footer>
+  <div id="fm-drop" class="fm-drop" hidden><span>Suelta para subir aquí</span></div>
+
+  <div id="fm-sheet" class="sheet" hidden>
+    <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="fm-sh-title">
+      <header class="sheet-head">
+        <div class="sheet-titles">
+          <h2 id="fm-sh-title" class="ellipsis"></h2>
+          <span id="fm-sh-sub" class="muted small"></span>
+        </div>
+        <button id="fm-sh-close" class="icon-btn" type="button" aria-label="Cerrar">✕</button>
+      </header>
+      <div id="fm-sh-body" class="fm-sh-body"></div>
+    </div>
+  </div>
+</section>

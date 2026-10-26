@@ -51,6 +51,10 @@ modules:
     ssh_options: ""
     sudo: false                # en local: usar `sudo -n` para mdadm/smartctl (necesita regla en sudoers)
 
+  files:                       # gestor de archivos del host por SFTP (el mismo SSH): copiar/pegar, subir, descargar…
+    enabled: false
+    roots: ["~"]               # lo único que se puede ver y tocar; p. ej. ["~", "/mnt"]
+
   sites:                       # webs que deben responder + días que le quedan al certificado, con avisos
     enabled: false
     urls: []                   # ["https://midominio.com", "http://127.0.0.1:8096"]
