@@ -2,7 +2,8 @@
 // (servido en /modules/<nombre>/), que exporta por defecto lo que aporta. Todo es opcional:
 //
 //   styles:  ["style.css"]                    su CSS (rutas relativas a su carpeta web/)
-//   scripts: ["https://cdn…/lib.js"]          <script> clásicos que necesita, en orden (xterm, marked…)
+//   scripts: ["https://cdn…/lib.js"]          <script> clásicos que necesita, en orden (xterm, marked…); no
+//                                              frenan el arranque: su init y su show esperan a que lleguen
 //   view:    { html: "view.html", name?, tab?: { icon, label, order? } }
 //            una vista en #<name> (por defecto, el nombre del módulo); con `tab`, además, sale en la barra
 //   cards:   [{ slot: "left" | "right" | "bottom", html: "card.html", order?, size?, title?, init?, show?, fast?, slow? }]
@@ -51,11 +52,34 @@ async function fragment(url) {
   return document.createRange().createContextualFragment(await r.text());
 }
 
+// Las librerías de fuera (xterm de jsdelivr…) no frenan el arranque: si la CDN va lenta, el panel sale igual y
+// solo ese módulo espera, porque su init y su show no se llaman hasta que han llegado.
+function waitScripts(def, base, name) {
+  let ready = Promise.resolve();
+  for (const s of def.scripts) ready = ready.then(() => loadScript(new URL(s, location.origin + base).href));
+  ready.catch((e) => toast(`Módulo ${name}: ${e.message}`, true));
+  let started = null;
+  let shown = false;
+  const start = () => (started ??= ready.then(() => def.init?.()));
+  return {
+    ...def,
+    init: () => { start().catch(() => {}); },
+    show: (args) => {
+      shown = true;
+      start().then(() => { if (shown) def.show?.(args); }).catch(() => {});
+    },
+    hide: () => { shown = false; if (started) def.hide?.(); },
+    leave: () => { shown = false; if (started) def.leave?.(); },
+  };
+}
+
 async function loadOne(name, order) {
   const base = `/modules/${name}/`;
-  const def = (await import(`${base}index.js`)).default || {};
-  await Promise.all((def.styles || []).map((s) => loadStyle(new URL(s, location.origin + base))));
-  for (const s of def.scripts || []) await loadScript(new URL(s, location.origin + base).href);
+  let def = (await import(`${base}index.js`)).default || {};
+  const styles = (def.styles || []).map((s) => new URL(s, location.origin + base));
+  styles.filter((u) => u.origin !== location.origin).forEach(loadStyle);  // las de fuera, sin esperar
+  await Promise.all(styles.filter((u) => u.origin === location.origin).map(loadStyle));
+  if (def.scripts?.length) def = waitScripts(def, base, name);
   const html = {};
   if (def.view?.html) html.view = await fragment(base + def.view.html);
   html.cards = await Promise.all((def.cards || []).map((c) => (c.html ? fragment(base + c.html) : null)));
