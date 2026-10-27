@@ -46,6 +46,16 @@ def _restart() -> None:
 PIN_RE = re.compile(r"^\d{4,12}$")
 
 
+class Static(StaticFiles):
+    """Sin Cache-Control el navegador se queda con la versión vieja horas (caché heurística) tras actualizar el panel:
+    así revalida siempre, y si no ha cambiado es un 304 de nada."""
+
+    def file_response(self, *args, **kwargs):
+        r = super().file_response(*args, **kwargs)
+        r.headers["Cache-Control"] = "no-cache"
+        return r
+
+
 def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
     restart = restart or _restart
     Path(cfg.data_dir).mkdir(parents=True, exist_ok=True)
@@ -361,8 +371,8 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
         app.include_router(r)
     for name in modules.MODULES:  # la interfaz de cada módulo activo, que el navegador carga bajo demanda
         if loaded(name) and (d := modules.web_dir(name)):
-            app.mount(f"/modules/{name}", StaticFiles(directory=d), name=f"module-{name}")
-    app.mount("/", StaticFiles(directory=cfg.web_dir, html=True, check_dir=False), name="web")
+            app.mount(f"/modules/{name}", Static(directory=d), name=f"module-{name}")
+    app.mount("/", Static(directory=cfg.web_dir, html=True, check_dir=False), name="web")
     return app
 
 

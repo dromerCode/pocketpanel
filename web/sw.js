@@ -1,8 +1,11 @@
 // Red primero para la app (siempre la última versión), caché como respaldo sin conexión.
-const CACHE = "pocketpanel-v6";
+const CACHE = "pocketpanel-v7";
 
 self.addEventListener("install", () => self.skipWaiting());
-self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener("activate", (e) => e.waitUntil((async () => {
+  for (const k of await caches.keys()) if (k !== CACHE) await caches.delete(k);  // las de versiones anteriores
+  await self.clients.claim();
+})()));
 
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
@@ -17,7 +20,7 @@ self.addEventListener("fetch", (e) => {
     return;
   }
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: "no-cache" })  // nunca la copia vieja de la caché HTTP del navegador
       .then((res) => {
         if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(e.request, copy)); }
         return res;

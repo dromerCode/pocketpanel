@@ -95,3 +95,18 @@ def test_containers_hide_update_flags_without_updates(tmp_path, monkeypatch):
     monkeypatch.setattr(ctx.docker, "stats", stats)
     svc = c.get("/api/containers").json()[0]
     assert svc["name"] == "web" and svc["update"] is False
+
+
+def test_static_always_revalidated(tmp_path):
+    """Tras actualizar el panel el navegador no puede seguir con el JS viejo de su caché."""
+    c = client(tmp_path, ALL)
+    for path in ("/js/main.js", "/modules/terminal/vendor/xterm.js"):
+        r = c.get(path)
+        assert r.status_code == 200 and r.headers["cache-control"] == "no-cache"
+        assert c.get(path, headers={"if-none-match": r.headers["etag"]}).status_code == 304
+
+
+def test_no_cdn_for_core_modules():
+    """El terminal no puede depender de que el móvil llegue a una CDN (algunos no llegan)."""
+    from pathlib import Path
+    assert "https://" not in Path("app/modules/terminal/web/index.js").read_text()
