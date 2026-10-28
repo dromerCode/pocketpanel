@@ -121,7 +121,9 @@ class Files:
         items = await self.fs.listdir(p)
         items.sort(key=lambda e: (not e["dir"], e["name"].casefold()))
         root = await self._root_of(p)
-        return {"path": p, "root": root, "parent": None if p == root else posixpath.dirname(p),
+        # Se sube hasta la carpeta de inicio más amplia: con ~ y / se puede pasar de ~ a /home
+        outer = min((r["path"] for r in await self.roots() if inside(p, r["path"])), key=len)
+        return {"path": p, "root": root, "parent": None if p == outer else posixpath.dirname(p),
                 "items": items[:MAX_ITEMS], "truncated": len(items) > MAX_ITEMS, "free": await self.fs.free(p)}
 
     async def file(self, path) -> tuple[str, dict]:

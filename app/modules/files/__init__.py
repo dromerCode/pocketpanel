@@ -7,6 +7,7 @@ MODULE = Module(
     order=55,
     fields=[
         field("roots", "Carpetas de inicio", "list", default=["~"],
-              help="Lo único que se puede ver y tocar (y lo de dentro). ~ es la carpeta personal; p. ej. ~ y /mnt."),
+              help="Lo único que se puede ver y tocar (y lo de dentro). ~ es la carpeta personal; p. ej. ~ y /mnt, o / para "
+                   "todo el disco (con los permisos del usuario del host, sin sudo)."),
     ],
 )

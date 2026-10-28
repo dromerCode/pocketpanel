@@ -120,7 +120,7 @@ function crumbs() {
   rel.forEach((p, i) => parts.push([p, join(root, rel.slice(0, i + 1).join("/"))]));
   const nav = $("fm-crumbs");
   nav.replaceChildren(...parts.flatMap(([name, p], i) => [
-    i ? el("span", { class: "fm-sep", "aria-hidden": "true" }, "/") : null,
+    i && parts[i - 1][1] !== "/" ? el("span", { class: "fm-sep", "aria-hidden": "true" }, "/") : null,  // «/ home», no «/ / home»
     el("a", { href: `#files/${encodeURIComponent(p)}`, class: i === parts.length - 1 ? "on" : null }, name),
   ].filter(Boolean)));
   nav.scrollLeft = nav.scrollWidth;

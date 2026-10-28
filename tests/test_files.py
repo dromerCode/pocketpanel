@@ -122,6 +122,18 @@ def test_roots_and_listing(tree):
     assert sub["parent"] == str(tree / "home") and sub["free"]["total"] > 0
 
 
+def test_nested_roots_go_up_to_the_widest(tree):
+    """Con ~ y una carpeta que la contiene (p. ej. /), ~ se ve como «Inicio» pero se puede subir más allá."""
+    f = Files(LocalFS(tree / "home"), ["~", str(tree)])
+    d = run(f.listing(str(tree / "home")))
+    assert d["root"] == str(tree / "home") and d["parent"] == str(tree)
+    top = run(f.listing(str(tree)))
+    assert top["root"] == str(tree) and top["parent"] is None
+    assert "secret" in [e["name"] for e in top["items"]]
+    with pytest.raises(FilesError):
+        run(f.delete([str(tree / "home")]))  # sigue siendo una carpeta de inicio
+
+
 def test_paths_stay_inside_roots(tree):
     f = files(tree)
     for bad in [str(tree / "secret"), str(tree / "home" / ".." / "secret"), str(tree / "home" / "atajo"),
