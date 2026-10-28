@@ -201,7 +201,7 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
     @app.put("/api/layout", dependencies=authed)
     async def put_layout(request: Request):
         try:
-            return save_layout(cfg.data_dir, (await json_body(request)).get("status"))
+            return save_layout(cfg.data_dir, (await json_body(request)).get("widgets"))
         except LayoutError as e:
             raise HTTPException(400, str(e))
 
@@ -398,6 +398,11 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
     @app.get("/index.html", include_in_schema=False)
     async def index(request: Request):
         return assets.index(request.headers)
+
+    @app.get("/api/version", include_in_schema=False)
+    async def version():
+        """La versión de la interfaz: una pestaña abierta de antes de actualizar ve que no es la suya y se recarga."""
+        return {"v": assets.version()}
 
     @app.get("/v/{ver}/{path:path}", include_in_schema=False)
     async def versioned(ver: str, path: str, request: Request):

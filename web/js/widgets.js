@@ -1,12 +1,12 @@
 // Los widgets de Estado: orden, ancho y ocultos, a gusto del usuario y guardados en el servidor (/api/layout).
 //
-// Cada widget es un .w en #st-grid con data-w (id), data-size (ancho por defecto, de 12 columnas), data-rank
+// Cada widget es un .w en #st-grid con data-w (id), data-size (ancho por defecto: columnas de 4), data-rank
 // (dónde sale por defecto) y data-title. Los del núcleo están en index.html; las tarjetas de los módulos las pone
 // registry.js. Un widget que no está en lo guardado (p. ej. el de un módulo recién activado) sale en su sitio por
 // defecto.
 import { api, el, toast } from "./api.js";
 
-const SIZES = [3, 4, 6, 8, 12];
+const COLS = 4;  // la rejilla: 1 = un cuarto del ancho, 4 = todo
 const $ = (id) => document.getElementById(id);
 const grid = () => $("st-grid");
 const widgets = () => [...grid().children].filter((w) => w.classList.contains("w"));
@@ -46,7 +46,7 @@ function save() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(async () => {
     try {
-      await api("/api/layout", { method: "PUT", body: { status: current() } });
+      await api("/api/layout", { method: "PUT", body: { widgets: current() } });
     } catch (e) {
       toast(`No se pudo guardar la organización: ${e.message}`, true);
     }
@@ -62,11 +62,10 @@ function renderTray() {
       `+ ${w.dataset.title}`)));
 }
 
-function resize(w, step) {
-  const i = SIZES.indexOf(Number(w.dataset.cur));
-  const next = SIZES[Math.min(SIZES.length - 1, Math.max(0, (i < 0 ? 2 : i) + step))];
-  if (next === Number(w.dataset.cur)) return;
-  setSize(w, next);
+function resize(w, size) {
+  if (size === Number(w.dataset.cur)) return;
+  setSize(w, size);
+  w.querySelector(":scope > .wtools").replaceWith(tools(w));
   save();
 }
 
@@ -104,14 +103,23 @@ function drag(w, e) {
   window.addEventListener("pointercancel", end);
 }
 
+/** Cuatro casillas, una por columna: las rellenas son lo que ocupa; tocar la tercera lo deja en 3 de 4. */
+function widthPicker(w) {
+  const cur = Number(w.dataset.cur);
+  return el("span", { class: "wwidth", role: "group", "aria-label": `Ancho de ${w.dataset.title}` },
+    ...Array.from({ length: COLS }, (_, i) => el("button", {
+      type: "button", class: i < cur ? "on" : "", title: `${i + 1} de ${COLS} columnas`,
+      "aria-pressed": String(i + 1 === cur), onclick: () => resize(w, i + 1),
+    })));
+}
+
 function tools(w) {
   const b = (label, title, fn) => el("button", { type: "button", class: "wtool", title, "aria-label": `${title}: ${w.dataset.title}`, onclick: fn }, label);
   const handle = el("button", { type: "button", class: "wtool whandle", title: "Mover", "aria-label": `Mover ${w.dataset.title}` }, "⠿");
   handle.addEventListener("pointerdown", (e) => drag(w, e));
   return el("div", { class: "wtools" }, handle,
     el("span", { class: "wname" }, w.dataset.title),
-    b("−", "Más estrecho", () => resize(w, -1)),
-    b("+", "Más ancho", () => resize(w, 1)),
+    widthPicker(w),
     b("✕", "Ocultar", () => { w.hidden = true; renderTray(); save(); }));
 }
 
@@ -139,7 +147,7 @@ export async function initWidgets() {
     save();
   };
   try {
-    apply((await api("/api/layout")).status);
+    apply((await api("/api/layout")).widgets);
   } catch (e) {
     if (e.message !== "no autenticado") toast(`Organización: ${e.message}`, true);
   }

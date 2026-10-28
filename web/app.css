@@ -108,10 +108,11 @@ a { color: inherit; }
 .seg-btn.active { background: var(--surface-2); color: var(--text); }
 
 /* Estado */
-/* Widgets: 4 columnas en el móvil (los estrechos van de dos en dos) y 12 en el PC; ver js/widgets.js */
+/* Widgets: una rejilla de 4 columnas y cada uno ocupa de 1 a 4 (js/widgets.js). En el móvil el de 1 es media
+   pantalla y los demás pantalla entera; en el PC ocupan lo suyo. */
 .wgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
 .w { grid-column: span 4; display: flex; flex-direction: column; min-width: 0; position: relative; container-type: inline-size; }
-.w[data-cur="3"], .w[data-cur="4"] { grid-column: span 2; }
+.w[data-cur="1"] { grid-column: span 2; }
 .w > .card { flex: 1; }
 .w > .section-title:first-child, .w > .section-head:first-child { margin-top: 4px; }
 .w > .section-title + * { flex: 1; }
@@ -129,6 +130,9 @@ a { color: inherit; }
 .wname { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wtool { width: 30px; height: 30px; flex: none; display: grid; place-items: center; padding: 0; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; font-size: 15px; }
 .whandle { cursor: grab; touch-action: none; }
+.wwidth { display: flex; gap: 3px; padding: 0 4px; }
+.wwidth button { width: 16px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-2); cursor: pointer; }
+.wwidth button.on { background: var(--accent); border-color: var(--accent); }
 .w.dragging .whandle { cursor: grabbing; }
 .card {
   display: flex; flex-direction: column; gap: 2px;
@@ -295,8 +299,10 @@ a { color: inherit; }
 
   /* Estado */
   #view-status .pad { padding: 20px 28px 28px; max-width: 1400px; width: 100%; margin: 0 auto; }
-  .wgrid { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
-  .w, .w[data-cur="3"], .w[data-cur="4"] { grid-column: span var(--span, 6); }
+  .wgrid { gap: 14px; }
+  .w, .w[data-cur="1"] { grid-column: span var(--span, 2); }
+  /* Organizando: las 4 columnas se ven de fondo */
+  .wgrid.editing { background: linear-gradient(to right, color-mix(in srgb, var(--accent) 7%, transparent) calc(100% - 14px), transparent 0) 0 0 / calc((100% + 14px) / 4) 100% repeat-x; }
 
   /* Servicios: lista + ficha al lado */
   #view-services { display: grid; grid-template-columns: var(--list-w) 1fr; grid-template-rows: auto auto 1fr; }
