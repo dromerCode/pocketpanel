@@ -1,0 +1,10 @@
+.pkg { display: flex; flex-direction: column; gap: 10px; }
+.pkg-sum { display: flex; flex-direction: column; gap: 2px; }
+.pkg-reboot { color: var(--warn); font-size: 13px; }
+.pkg-list summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+.pkg-list ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow: auto; }
+.pkg-list li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.pkg-list li > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pkg-ver { flex: none; color: var(--muted); max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pkg-sec { color: var(--warn); font-weight: 700; }
+.pkg-btns { display: flex; gap: 8px; margin-top: auto; }

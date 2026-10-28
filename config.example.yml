@@ -23,6 +23,9 @@ modules:
     enabled: true
     check_at: "05:30"
 
+  packages:                    # paquetes del sistema (apt) por actualizar y actualizarlos desde Estado
+    enabled: false             # en sudoers, sin contraseña: /usr/bin/apt update, /usr/bin/apt upgrade -y
+
   claude:                      # chat con Claude Code en el host + informe diario por push
     enabled: false             # necesita `claude` instalado y con sesión iniciada en el servidor
     home: ""                   # HOME con el que usas claude; vacío = el de tu usuario

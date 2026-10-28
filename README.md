@@ -32,6 +32,7 @@ Optional modules, turned on and configured from the app itself (**Status → ⚙
 | `terminal` (on) | Full terminal (bash, tmux) on the host over SSH | `tmux` for tmux mode |
 | `actions` (on) | One-tap buttons that run your own commands (`actions.yml`) | – |
 | `updates` (on) | Daily check for newer images, one-tap update with automatic rollback if the new container doesn't come up | – |
+| `packages` | System packages (apt) waiting for an update, with security ones and a pending reboot flagged; check and upgrade from Estado. The upgrade runs detached on the host, so it survives the panel restarting (e.g. when Docker itself is upgraded) | passwordless `sudo apt update` and `sudo apt upgrade -y` (`user ALL=(root) NOPASSWD: /usr/bin/apt update, /usr/bin/apt upgrade -y`) |
 | `claude` | Chat with [Claude Code](https://claude.com/claude-code) running on the server, attach files, daily health report by push | `claude` installed and logged in |
 | `backups` | Nightly incremental backups (rsync + hardlinks) of a folder to another machine over SSH, restore one app's folder from the container sheet | `rsync` on both ends |
 | `raid` | mdadm RAID state + SMART (local or on another box over SSH) | `mdadm`, `smartctl` |

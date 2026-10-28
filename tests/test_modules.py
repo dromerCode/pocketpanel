@@ -18,6 +18,7 @@ modules:
   jellyfin: {enabled: true}
   stocks: {enabled: true}
   files: {enabled: true}
+  packages: {enabled: true}
 """
 NONE = """
 name: casa-ramon
