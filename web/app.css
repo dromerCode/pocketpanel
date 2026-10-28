@@ -301,8 +301,6 @@ a { color: inherit; }
   #view-status .pad { padding: 20px 28px 28px; max-width: 1400px; width: 100%; margin: 0 auto; }
   .wgrid { gap: 14px; }
   .w, .w[data-cur="1"] { grid-column: span var(--span, 2); }
-  /* Organizando: las 4 columnas se ven de fondo */
-  .wgrid.editing { background: linear-gradient(to right, color-mix(in srgb, var(--accent) 7%, transparent) calc(100% - 14px), transparent 0) 0 0 / calc((100% + 14px) / 4) 100% repeat-x; }
 
   /* Servicios: lista + ficha al lado */
   #view-services { display: grid; grid-template-columns: var(--list-w) 1fr; grid-template-rows: auto auto 1fr; }
