@@ -1,12 +1,12 @@
 // Los widgets de Estado: orden, ancho y ocultos, a gusto del usuario y guardados en el servidor (/api/layout).
 //
-// Cada widget es un .w en #st-grid con data-w (id), data-size (ancho por defecto, de 12 columnas), data-rank
+// Cada widget es un .w en #st-grid con data-w (id), data-size (ancho por defecto, de 1 a 4 columnas), data-rank
 // (dónde sale por defecto) y data-title. Los del núcleo están en index.html; las tarjetas de los módulos las pone
 // registry.js. Un widget que no está en lo guardado (p. ej. el de un módulo recién activado) sale en su sitio por
 // defecto.
 import { api, el, toast } from "./api.js";
 
-const SIZES = [3, 4, 6, 8, 12];
+const SIZES = [1, 2, 3, 4];  // columnas de 4
 const $ = (id) => document.getElementById(id);
 const grid = () => $("st-grid");
 const widgets = () => [...grid().children].filter((w) => w.classList.contains("w"));
@@ -64,7 +64,7 @@ function renderTray() {
 
 function resize(w, step) {
   const i = SIZES.indexOf(Number(w.dataset.cur));
-  const next = SIZES[Math.min(SIZES.length - 1, Math.max(0, (i < 0 ? 2 : i) + step))];
+  const next = SIZES[Math.min(SIZES.length - 1, Math.max(0, (i < 0 ? 1 : i) + step))];
   if (next === Number(w.dataset.cur)) return;
   setSize(w, next);
   save();
