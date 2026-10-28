@@ -27,6 +27,7 @@ from .layout import LayoutError, load_layout, save_layout
 from .monitor import Monitor
 from .push import PushService
 from .ssh import SSH, SSHError
+from .processes import Processes
 from .system import SYSTEM_SCRIPT, parse_system
 from .wsutil import until_disconnect
 
@@ -147,6 +148,12 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
         up = sum(1 for c in containers if c["State"] == "running")
         r["containers"] = {"up": up, "down": len(containers) - up}
         return r
+
+    procs = Processes(ctx.ssh)
+
+    @app.get("/api/processes", dependencies=authed)
+    async def processes(sort: str = "cpu", q: str = ""):
+        return await procs.sample(sort, q)
 
     @app.get("/api/containers", dependencies=authed)
     async def containers():

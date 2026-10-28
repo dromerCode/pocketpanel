@@ -144,6 +144,27 @@ a { color: inherit; }
 .disk-row { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; margin-bottom: 5px; }
 .disk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .disk-num { flex: none; color: var(--muted); font-size: 12px; }
+
+/* Procesos (Estado) */
+.pr-toggle { padding: 0; background: none; border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.pr-toggle::before { content: "▸"; font-size: 11px; transition: transform .15s; }
+.pr-toggle[aria-expanded="true"]::before { transform: rotate(90deg); }
+.pr-toggle:hover { color: var(--text); }
+.pr-body { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.pr-bar { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.pr-q { flex: 1; min-width: 0; height: 32px; padding: 0 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; outline: none; font-size: 14px; }
+.pr-q:focus { border-color: var(--accent); }
+.pr-bar > span { flex: none; }
+.pr-list { list-style: none; margin: 0; padding: 0; max-height: 440px; overflow-y: auto; }
+.pr-row { display: grid; grid-template-columns: minmax(0, 1fr) 64px 72px; column-gap: 8px; align-items: baseline; padding: 6px 12px; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.pr-row:last-child { border-bottom: 0; }
+.pr-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.pr-cpu, .pr-mem { text-align: right; font-size: 12.5px; }
+.pr-cpu.warn { color: var(--warn, #e0a030); }
+.pr-cpu.bad { color: var(--danger); font-weight: 700; }
+.pr-cmd { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
+.pr-empty { padding: 16px; text-align: center; }
+@media (max-width: 520px) { .pr-bar > span { display: none; } }
 .bar { height: 7px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
 .bar.warn > i { background: var(--warn); }

@@ -1,6 +1,7 @@
 import { api, el, fmtBytes, fmtUptime, toast } from "./api.js";
 import { renderCharts } from "./charts.js";
 import { initPush } from "./push.js";
+import { closeProcs, initProcs } from "./procs.js";
 import { cards } from "./registry.js";
 import { initWidgets, leaveWidgets } from "./widgets.js";
 
@@ -72,6 +73,7 @@ export function init() {
   new ResizeObserver(() => { if (lastHistory.length) renderCharts($("charts"), lastHistory, range); }).observe($("charts"));
   initPush();
   initWidgets();
+  initProcs();
   each("init");
 }
 
@@ -88,6 +90,7 @@ export function hide() {
   clearInterval(timer);
   clearInterval(slowTimer);
   timer = slowTimer = null;
+  closeProcs();
 }
 
 export function leave() {
