@@ -111,7 +111,7 @@ a { color: inherit; }
 /* Widgets: 4 columnas en el móvil (los estrechos van de dos en dos) y 12 en el PC; ver js/widgets.js */
 .wgrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: stretch; }
 .w { grid-column: span 4; display: flex; flex-direction: column; min-width: 0; position: relative; container-type: inline-size; }
-.w[data-cur="1"] { grid-column: span 2; }  /* en el móvil, 1 columna es media pantalla */
+.w[data-cur="3"], .w[data-cur="4"] { grid-column: span 2; }
 .w > .card { flex: 1; }
 .w > .section-title:first-child, .w > .section-head:first-child { margin-top: 4px; }
 .w > .section-title + * { flex: 1; }
@@ -170,15 +170,6 @@ a { color: inherit; }
 .pr-cpu.bad { color: var(--danger); font-weight: 700; }
 .pr-cmd { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
 .pr-empty { padding: 16px; text-align: center; }
-.pr-row { cursor: pointer; }
-.pr-row:hover { background: var(--surface-2); }
-.pr-row.open { background: var(--surface-2); }
-.pr-row.open .pr-cmd { white-space: normal; overflow-wrap: anywhere; }
-.pr-ctr { color: #6fa8ff; font-weight: 600; }
-.pr-danger { color: var(--danger); }
-.pr-acts { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; }
-.pr-head { cursor: default; }
-.pr-head:hover { background: none; }
 .bar { height: 7px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
 .bar > i { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
 .bar.warn > i { background: var(--warn); }
@@ -304,8 +295,8 @@ a { color: inherit; }
 
   /* Estado */
   #view-status .pad { padding: 20px 28px 28px; max-width: 1400px; width: 100%; margin: 0 auto; }
-  .wgrid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
-  .w, .w[data-cur="1"] { grid-column: span var(--span, 2); }
+  .wgrid { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
+  .w, .w[data-cur="3"], .w[data-cur="4"] { grid-column: span var(--span, 6); }
 
   /* Servicios: lista + ficha al lado */
   #view-services { display: grid; grid-template-columns: var(--list-w) 1fr; grid-template-rows: auto auto 1fr; }
