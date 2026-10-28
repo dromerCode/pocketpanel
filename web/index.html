@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-v="{{V}}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
@@ -8,7 +8,10 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/icon-192.png">
-  <link rel="stylesheet" href="/app.css">
+  <!-- {{V}} lo pone el servidor (app/assets.py): la versión de la interfaz, para guardarla en caché para siempre -->
+  <link rel="stylesheet" href="/v/{{V}}/app.css">
+  <script type="importmap">{"imports": {"/js/": "/v/{{V}}/js/", "/modules/": "/v/{{V}}/modules/"}}</script>
+  <!--modulepreload-->
 </head>
 <body>
   <!-- Login -->
@@ -66,11 +69,11 @@
         </div>
         <!-- Los widgets: los del núcleo y las tarjetas de los módulos (registry.js); el orden y el ancho los pone widgets.js -->
         <div id="st-grid" class="wgrid">
-          <div class="w" data-w="cpu" data-title="CPU" data-size="3" data-rank="10"><div class="card"><span class="card-label">CPU</span><span id="st-cpu" class="card-value mono">–</span><span id="st-load" class="card-sub mono"></span></div></div>
-          <div class="w" data-w="ram" data-title="RAM" data-size="3" data-rank="11"><div class="card"><span class="card-label">RAM</span><span id="st-mem" class="card-value mono">–</span><span id="st-mem-sub" class="card-sub mono"></span></div></div>
-          <div class="w" data-w="temp" data-title="Temperatura" data-size="3" data-rank="12"><div class="card"><span class="card-label">Temperatura</span><span id="st-temp" class="card-value mono">–</span><span class="card-sub">CPU</span></div></div>
-          <div class="w" data-w="containers" data-title="Contenedores" data-size="3" data-rank="13"><a class="card card-link" id="st-containers" href="#services"><span class="card-label">Contenedores</span><span id="st-up" class="card-value mono">–</span><span id="st-down" class="card-sub"></span></a></div>
-          <div class="w" data-w="history" data-title="Historial" data-size="12" data-rank="20">
+          <div class="w" data-w="cpu" data-title="CPU" data-size="1" data-rank="10"><div class="card"><span class="card-label">CPU</span><span id="st-cpu" class="card-value mono">–</span><span id="st-load" class="card-sub mono"></span></div></div>
+          <div class="w" data-w="ram" data-title="RAM" data-size="1" data-rank="11"><div class="card"><span class="card-label">RAM</span><span id="st-mem" class="card-value mono">–</span><span id="st-mem-sub" class="card-sub mono"></span></div></div>
+          <div class="w" data-w="temp" data-title="Temperatura" data-size="1" data-rank="12"><div class="card"><span class="card-label">Temperatura</span><span id="st-temp" class="card-value mono">–</span><span class="card-sub">CPU</span></div></div>
+          <div class="w" data-w="containers" data-title="Contenedores" data-size="1" data-rank="13"><a class="card card-link" id="st-containers" href="#services"><span class="card-label">Contenedores</span><span id="st-up" class="card-value mono">–</span><span id="st-down" class="card-sub"></span></a></div>
+          <div class="w" data-w="history" data-title="Historial" data-size="4" data-rank="20">
             <div class="section-head">
               <h2 class="section-title">Historial</h2>
               <div class="seg" id="hist-range">
@@ -81,11 +84,11 @@
             </div>
             <div id="charts" class="charts"></div>
           </div>
-          <div class="w" data-w="disks" data-title="Discos" data-size="6" data-rank="50">
+          <div class="w" data-w="disks" data-title="Discos" data-size="2" data-rank="50">
             <h2 class="section-title">Discos</h2>
             <ul id="st-disks" class="disks"></ul>
           </div>
-          <div class="w" data-w="procs" data-title="Procesos" data-size="12" data-rank="60">
+          <div class="w" data-w="procs" data-title="Procesos" data-size="4" data-rank="60">
             <div class="card pr">
               <button id="pr-toggle" class="pr-toggle" type="button" aria-expanded="false" aria-controls="pr-body">
                 <span class="card-label">Procesos</span><span class="muted small pr-hint">toca para ver qué está consumiendo</span>
@@ -219,6 +222,6 @@
 
   <div id="toast" class="toast" hidden></div>
 
-  <script type="module" src="/js/main.js"></script>
+  <script type="module" src="/v/{{V}}/js/main.js"></script>
 </body>
 </html>

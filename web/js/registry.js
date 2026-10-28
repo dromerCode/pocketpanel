@@ -2,13 +2,14 @@
 // (servido en /modules/<nombre>/), que exporta por defecto lo que aporta. Todo es opcional:
 //
 //   styles:  ["style.css"]                    su CSS (rutas relativas a su carpeta web/)
-//   scripts: ["https://cdn…/lib.js"]          <script> clásicos que necesita, en orden (xterm, marked…); no
-//                                              frenan el arranque: su init y su show esperan a que lleguen
+//   scripts: ["vendor/lib.js"]                <script> clásicos que necesita, en orden (xterm, marked…); se
+//                                              descargan al abrir su vista por primera vez, y su init y su show
+//                                              esperan a que lleguen
 //   view:    { html: "view.html", name?, tab?: { icon, label, order? } }
 //            una vista en #<name> (por defecto, el nombre del módulo); con `tab`, además, sale en la barra
 //   cards:   [{ slot: "left" | "right" | "bottom", html: "card.html", order?, size?, title?, init?, show?, fast?, slow? }]
 //            widgets en Estado: init una vez, show al entrar, fast cada 5 s y slow cada 30 s. `slot` y `order`
-//            dicen dónde salen la primera vez y `size` su ancho (3, 4, 6, 8 o 12 de 12 columnas); luego cada
+//            dicen dónde salen la primera vez y `size` su ancho (1 a 4 columnas); luego cada
 //            cual los mueve y los ensancha desde «Organizar» (widgets.js)
 //   tour:    [{ sel, title, text }]            sus pasos del tutorial
 //   init()                                     una vez al arrancar (p. ej. para engancharse a Servicios)
@@ -18,7 +19,7 @@ import { toast } from "./api.js";
 // Dónde cae por defecto cada tarjeta en Estado según su `slot` (el usuario luego la mueve y la ensancha a su gusto):
 // left = tras el historial, right = tras los discos, bottom = al final a lo ancho
 const SLOT_RANK = { left: 30, right: 60, bottom: 90 };
-const SLOT_SIZE = { left: 6, right: 6, bottom: 12 };
+const SLOT_SIZE = { left: 2, right: 2, bottom: 4 };
 
 export const loaded = [];   // [{ name, def, base, order }] en el orden de la tienda
 const scripts = new Map();  // url → promesa: cada librería se carga una vez aunque la pidan dos módulos
@@ -52,18 +53,23 @@ async function fragment(url) {
   return document.createRange().createContextualFragment(await r.text());
 }
 
-// Las librerías de fuera (xterm de jsdelivr…) no frenan el arranque: si la CDN va lenta, el panel sale igual y
-// solo ese módulo espera, porque su init y su show no se llaman hasta que han llegado.
+// Las librerías (xterm…) no frenan el arranque ni se descargan si no hacen falta: llegan al abrir la vista del
+// módulo por primera vez, y hasta entonces no se llama a su init (ni a su show).
 function waitScripts(def, base, name) {
-  let ready = Promise.resolve();
-  for (const s of def.scripts) ready = ready.then(() => loadScript(new URL(s, location.origin + base).href));
-  ready.catch((e) => toast(`Módulo ${name}: ${e.message}`, true));
   let started = null;
   let shown = false;
-  const start = () => (started ??= ready.then(() => def.init?.()));
+  const start = () => (started ??= (async () => {
+    try {
+      for (const s of def.scripts) await loadScript(new URL(s, location.origin + base).href);
+    } catch (e) {
+      toast(`Módulo ${name}: ${e.message}`, true);
+      throw e;
+    }
+    await def.init?.();
+  })());
   return {
     ...def,
-    init: () => { start().catch(() => {}); },
+    init: () => {},
     show: (args) => {
       shown = true;
       start().then(() => { if (shown) def.show?.(args); }).catch(() => {});
@@ -73,8 +79,12 @@ function waitScripts(def, base, name) {
   };
 }
 
+// La versión de la interfaz (la pone el servidor en index.html): con ella en la URL, todo se guarda en caché para siempre
+const V = document.documentElement.dataset.v;
+const prefix = V && !V.includes("{") ? `/v/${V}` : "";
+
 async function loadOne(name, order) {
-  const base = `/modules/${name}/`;
+  const base = `${prefix}/modules/${name}/`;
   let def = (await import(`${base}index.js`)).default || {};
   const styles = (def.styles || []).map((s) => new URL(s, location.origin + base));
   styles.filter((u) => u.origin !== location.origin).forEach(loadStyle);  // las de fuera, sin esperar

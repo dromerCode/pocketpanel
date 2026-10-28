@@ -16,7 +16,7 @@ from . import auth, modules
 from .catalog import CATALOG, GENERAL, secret_keys
 from .config import Config, ConfigError, saved_values, settings
 from .config_writer import apply_changes
-from .core import json_body
+from .core import Shared, json_body
 from .authstore import ensure_secret, save_pin
 from .secrets import load_secrets, save_secrets
 from .core import Context, UnavailableError
@@ -27,8 +27,9 @@ from .layout import LayoutError, load_layout, save_layout
 from .monitor import Monitor
 from .push import PushService
 from .ssh import SSH, SSHError
-from .processes import Processes
-from .system import SYSTEM_SCRIPT, parse_system
+from .assets import IMMUTABLE, Assets, GzipJSON
+from .processes import ProcessError, Processes
+from .system import SystemSampler
 from .wsutil import until_disconnect
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -68,7 +69,8 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
     ctx.deps = deps or Deps(cfg.data_dir)
     ctx.deps.prune([m for m in modules.MODULES if cfg.enabled(m)])
     routers = modules.load(ctx)
-    ctx.monitor = Monitor(cfg, ctx.ssh, ctx.docker, ctx.history, ctx.push, hooks=ctx.hooks)
+    ctx.sampler = SystemSampler(ctx.ssh, ctx.docker, cfg.disks)
+    ctx.monitor = Monitor(cfg, ctx.ssh, ctx.docker, ctx.history, ctx.push, hooks=ctx.hooks, sampler=ctx.sampler)
     loaded = lambda m: cfg.enabled(m) and m not in ctx.deps_pending  # noqa: E731
     installing: dict[str, asyncio.Task] = {}
 
@@ -101,7 +103,6 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.cfg, app.state.ctx = cfg, ctx
     authed = [Depends(auth.require_auth)]
-    cpu_prev = {}
 
     @app.exception_handler(SSHError)
     @app.exception_handler(DockerError)
@@ -143,25 +144,37 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
 
     @app.get("/api/system", dependencies=authed)
     async def system():
-        out, containers = await asyncio.gather(ctx.ssh.run(SYSTEM_SCRIPT), ctx.docker.containers())
-        r, cpu_prev["v"] = parse_system(out, cpu_prev.get("v"), cfg.disks)
+        r, containers = await ctx.sampler.sample()
+        r = dict(r)
         up = sum(1 for c in containers if c["State"] == "running")
         r["containers"] = {"up": up, "down": len(containers) - up}
         return r
 
-    procs = Processes(ctx.ssh)
+    procs = Processes(ctx.ssh, ctx.docker)
 
     @app.get("/api/processes", dependencies=authed)
     async def processes(sort: str = "cpu", q: str = ""):
         return await procs.sample(sort, q)
 
-    @app.get("/api/containers", dependencies=authed)
-    async def containers():
+    @app.post("/api/processes/{pid}/{sig}", dependencies=authed)
+    async def process_signal(pid: int, sig: str):
+        try:
+            await procs.signal(pid, sig.upper())
+        except ProcessError as e:
+            raise HTTPException(400, str(e))
+        return {"ok": True}
+
+    async def _services():
         from .services import build_services
         cs = await ctx.docker.containers()
         stats = await ctx.docker.stats([c["Id"] for c in cs if c["State"] == "running"])
-        out = build_services(cs, stats, cfg.services)
+        return build_services(cs, stats, cfg.services)
+    services_now = Shared(_services)  # una consulta a Docker por contenedor, compartida entre pantallas
+
+    @app.get("/api/containers", dependencies=authed)
+    async def containers():
         u = ctx.updater
+        out = [dict(svc) for svc in await services_now.get()]
         for svc in out:
             svc["update"] = bool(u) and u.results.get(svc["name"], {}).get("status") == "update"
             job = u.jobs.get(svc["name"]) if u else None
@@ -173,6 +186,7 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
         if verb in ("stop", "restart"):
             ctx.monitor.alerts.user_stopped(name, time.time())
         await ctx.docker.action(name, verb)
+        services_now.invalidate()
         return {"ok": True}
 
     @app.get("/api/history", dependencies=authed)
@@ -376,9 +390,26 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
 
     for r in routers:
         app.include_router(r)
-    for name in modules.MODULES:  # la interfaz de cada módulo activo, que el navegador carga bajo demanda
-        if loaded(name) and (d := modules.web_dir(name)):
-            app.mount(f"/modules/{name}", Static(directory=d), name=f"module-{name}")
+    # La interfaz, con versión en la URL y comprimida (assets.py); lo de sin versión queda para sw.js, iconos…
+    mod_dirs = {n: d for n in modules.MODULES if loaded(n) and (d := modules.web_dir(n))}
+    assets = Assets(cfg.web_dir, mod_dirs)
+
+    @app.get("/", include_in_schema=False)
+    @app.get("/index.html", include_in_schema=False)
+    async def index(request: Request):
+        return assets.index(request.headers)
+
+    @app.get("/v/{ver}/{path:path}", include_in_schema=False)
+    async def versioned(ver: str, path: str, request: Request):
+        f = assets.resolve(path)
+        if not f:
+            raise HTTPException(404)
+        # Una versión que no es la actual (una pestaña abierta de antes de actualizar): lo de ahora, sin guardarlo
+        return assets.response(f, request.headers, IMMUTABLE if ver == assets.version() else "no-cache")
+
+    app.add_middleware(GzipJSON)
+    for name, d in mod_dirs.items():
+        app.mount(f"/modules/{name}", Static(directory=d), name=f"module-{name}")
     app.mount("/", Static(directory=cfg.web_dir, html=True, check_dir=False), name="web")
     return app
 
