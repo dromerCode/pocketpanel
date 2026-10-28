@@ -317,6 +317,10 @@ export function hide() {
 }
 
 export async function loadCard() {
+  // La gráfica, con el mismo rango que la pestaña Bolsa; las series las cachea el servidor 5 min
+  api(`/api/stocks/history?range=${range}`)
+    .then((h) => chart($("stk-card-chart"), h.values_eur, { labels: h.labels, marks: h.buy_dates, area: true, h: 64 }))
+    .catch(() => $("stk-card-chart").replaceChildren());
   try {
     const d = await api("/api/stocks");
     const pl = d.value_eur - d.invested_eur;

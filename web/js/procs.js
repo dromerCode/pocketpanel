@@ -13,8 +13,7 @@ const isOpen = () => $("pr-toggle").getAttribute("aria-expanded") === "true";
 const cpuLevel = (pct) => (pct >= 90 ? "bad" : pct >= 40 ? "warn" : "");  // 100 % = un núcleo
 
 function render(d) {
-  const shown = d.shown < d.count ? `${d.shown} de ${d.count}` : `${d.count}`;
-  $("pr-sum").textContent = `${shown} procesos · ${d.ncpu} núcleos`;
+  $("pr-sum").textContent = d.shown < d.count ? `${d.shown} de ${d.count}` : `${d.count} procesos`;
   const rows = d.procs.map((p) => el("li", { class: "pr-row", title: `${p.pid} · ${p.user}\n${p.cmd}` },
     el("span", { class: "pr-name" }, p.name),
     el("span", { class: `pr-cpu mono ${p.cpu == null ? "" : cpuLevel(p.cpu)}` }, p.cpu == null ? "…" : `${p.cpu.toFixed(1)}%`),
@@ -39,7 +38,7 @@ async function load() {
 
 function setOpen(open) {
   $("pr-toggle").setAttribute("aria-expanded", String(open));
-  $("pr-body").hidden = $("pr-sort").hidden = !open;
+  $("pr-body").hidden = !open;
   clearInterval(timer);
   timer = null;
   if (open) {
@@ -53,10 +52,10 @@ function setOpen(open) {
 
 export function initProcs() {
   $("pr-toggle").onclick = () => setOpen(!isOpen());
-  for (const b of document.querySelectorAll("#pr-sort .seg-btn")) {
+  for (const b of document.querySelectorAll("#pr-sort .pr-sort")) {  // las cabeceras de CPU y RAM ordenan
     b.onclick = () => {
       sort = b.dataset.sort;
-      for (const x of document.querySelectorAll("#pr-sort .seg-btn")) x.classList.toggle("active", x === b);
+      for (const x of document.querySelectorAll("#pr-sort .pr-sort")) x.classList.toggle("on", x === b);
       load();
     };
   }

@@ -57,7 +57,6 @@
         <span id="st-uptime" class="muted mono small"></span>
         <button id="st-edit" class="icon-btn" title="Organizar" aria-label="Organizar los widgets">✎</button>
         <button id="push-btn" class="icon-btn" title="Avisos" aria-label="Avisos">🔕</button>
-        <a href="#modules" class="icon-btn" title="Módulos y ajustes" aria-label="Módulos y ajustes">⚙</a>
       </header>
       <div class="scroll pad">
         <div id="st-editbar" class="wbar" hidden>
@@ -87,16 +86,19 @@
             <ul id="st-disks" class="disks"></ul>
           </div>
           <div class="w" data-w="procs" data-title="Procesos" data-size="12" data-rank="60">
-            <div class="section-head">
-              <button id="pr-toggle" class="section-title pr-toggle" type="button" aria-expanded="false" aria-controls="pr-body">Procesos</button>
-              <div class="seg" id="pr-sort" hidden>
-                <button class="seg-btn active" data-sort="cpu">CPU</button>
-                <button class="seg-btn" data-sort="mem">RAM</button>
+            <div class="card pr">
+              <button id="pr-toggle" class="pr-toggle" type="button" aria-expanded="false" aria-controls="pr-body">
+                <span class="card-label">Procesos</span><span class="muted small pr-hint">toca para ver qué está consumiendo</span>
+              </button>
+              <div id="pr-body" class="pr-body" hidden>
+                <div class="pr-bar"><span id="pr-sum" class="muted small mono"></span><input id="pr-q" class="pr-q" type="search" placeholder="Filtrar: nombre, usuario, pid" autocomplete="off"></div>
+                <div class="pr-row pr-head" id="pr-sort">
+                  <span class="muted small">Proceso</span>
+                  <button class="pr-sort on" type="button" data-sort="cpu">CPU</button>
+                  <button class="pr-sort" type="button" data-sort="mem">RAM</button>
+                </div>
+                <ul id="pr-list" class="pr-list"></ul>
               </div>
-            </div>
-            <div id="pr-body" class="pr-body" hidden>
-              <div class="pr-bar"><input id="pr-q" class="pr-q" type="search" placeholder="Filtrar: nombre, usuario, pid" autocomplete="off"><span id="pr-sum" class="muted small mono"></span></div>
-              <ul id="pr-list" class="pr-list"></ul>
             </div>
           </div>
         </div>
@@ -139,6 +141,8 @@
     <nav class="tabbar">
       <a href="#status" data-tab="status"><span class="tab-ico">◉</span>Estado</a>
       <a href="#services" data-tab="services"><span class="tab-ico">▤</span>Servicios</a>
+      <!-- Siempre la última (los módulos se colocan delante: data-order) y, en PC, abajo del todo -->
+      <a href="#modules" data-tab="modules" data-order="10000" class="tab-settings" title="Módulos y ajustes"><span class="tab-ico">⚙</span>Ajustes</a>
     </nav>
   </main>
 
