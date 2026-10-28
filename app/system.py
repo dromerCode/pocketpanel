@@ -1,4 +1,6 @@
+import asyncio
 import fnmatch
+import time
 
 # Sensores de CPU conocidos, por preferencia; si no hay ninguno se usa el primero que aparezca.
 SENSORS = ("k10temp", "zenpower", "coretemp", "cpu_thermal", "acpitz")
@@ -11,9 +13,11 @@ echo @mem; grep -E '^(MemTotal|MemAvailable):' /proc/meminfo
 echo @up; cat /proc/uptime
 echo @load; cat /proc/loadavg
 echo @temp; for h in /sys/class/hwmon/hwmon*; do [ -r $h/temp1_input ] && echo "$(cat $h/name) $(cat $h/temp1_input)"; done 2>/dev/null
-echo @df; timeout 4 df -P -B1 2>/dev/null
 true
 """
+DF_SCRIPT = "echo @df; timeout 4 df -P -B1 2>/dev/null\n"
+FRESH = 4      # s: una muestra así de reciente sirve a todos (el móvil y el PC a la vez, el monitor…)
+DF_EVERY = 30  # s: el espacio libre cambia despacio y df es lo más lento (montajes de red)
 
 
 def _sections(out: str) -> dict:
@@ -96,3 +100,31 @@ def parse_system(out: str, prev_cpu: tuple | None, disks: list | None = None):
     r["temp"] = _temp(s.get("temp", []))
     r["disks"] = _disks(s.get("df", []), disks or [])
     return r, cpu
+
+
+class SystemSampler:
+    """Una sola medición del host para todos los que la piden: la API de Estado (cada 5 s por pantalla abierta) y el
+    monitor (cada 30 s). Si la última tiene menos de `max_age` segundos se reutiliza; df solo cada 30 s."""
+
+    def __init__(self, ssh, docker, disks: list | None = None):
+        self.ssh, self.docker, self.disks = ssh, docker, disks
+        self._lock = asyncio.Lock()
+        self._cpu_prev = None
+        self._last, self._at = None, 0.0
+        self._disks, self._df_at = [], -DF_EVERY
+
+    async def sample(self, max_age: float = FRESH) -> tuple[dict, list]:
+        """→ (lo de /api/system sin contenedores, la lista de contenedores de Docker)."""
+        async with self._lock:
+            now = time.monotonic()
+            if self._last and now - self._at < max_age:
+                return self._last
+            df = now - self._df_at >= DF_EVERY
+            out, containers = await asyncio.gather(self.ssh.run(SYSTEM_SCRIPT + (DF_SCRIPT if df else "")),
+                                                   self.docker.containers())
+            r, self._cpu_prev = parse_system(out, self._cpu_prev, self.disks)
+            if df:
+                self._disks, self._df_at = r["disks"], now
+            r["disks"] = self._disks
+            self._last, self._at = (r, containers), now
+            return self._last

@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 
 from .alerts import Alerts
-from .system import SYSTEM_SCRIPT, parse_system
+from .system import SystemSampler
 
 log = logging.getLogger("pocketpanel.monitor")
 INTERVAL = 30
@@ -23,22 +23,20 @@ class Monitor:
     """Cada 30 s: guarda una muestra para las gráficas, busca cosas que avisar por push y da paso a los
     módulos (`hooks`: objetos con `async tick(n, now) -> [(texto, url)]`)."""
 
-    def __init__(self, cfg, ssh, docker, history, push, hooks=None):
+    def __init__(self, cfg, ssh, docker, history, push, hooks=None, sampler=None):
         self.cfg, self.ssh, self.docker, self.history, self.push = cfg, ssh, docker, history, push
         self.hooks = list(hooks or [])
         self.alerts = Alerts(cfg.disk_alert_percent)
-        self._cpu_prev = None
+        self.sampler = sampler or SystemSampler(ssh, docker, cfg.disks)
 
     async def tick(self, n: int) -> None:
         now = time.time()
         notes: list[tuple[str, str]] = []
-        out = await self.ssh.run(SYSTEM_SCRIPT)
-        r, self._cpu_prev = parse_system(out, self._cpu_prev, self.cfg.disks)
+        r, cs = await self.sampler.sample(max_age=0)  # siempre una nueva; las pantallas abiertas la reaprovechan
         mem = round(r["mem"]["used"] * 100 / r["mem"]["total"], 1) if r["mem"] else None
         self.history.add(int(now), r["cpu"], mem, r["temp"])
         notes += [(m, "/#status") for m in self.alerts.disks(r["disks"])]
 
-        cs = await self.docker.containers()
         states = {c["Names"][0].lstrip("/"): c["State"] for c in cs}
         notes += [(m, "/#services/down") for m in self.alerts.containers(states, now)]
 
