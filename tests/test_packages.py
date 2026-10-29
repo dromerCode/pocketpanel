@@ -73,3 +73,10 @@ def test_packages_cache_and_start():
             await pk.start(False)
 
     asyncio.run(go())
+
+
+def test_parse_job_conffile_prompt_hint():
+    out = ("@done\n$ sudo apt upgrade -y\ndpkg: error processing package nginx (--configure):\n"
+           " end of file on stdin at conffile prompt\n@rc 100\n")
+    j = parse_job(out)
+    assert j["status"] == "failed" and "  sudo dpkg --configure -a" in j["lines"]

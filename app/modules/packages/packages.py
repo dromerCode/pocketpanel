@@ -75,6 +75,11 @@ def parse_job(out: str) -> dict | None:
             lines.append("")
             lines.append("sudo pide contraseña: añade en sudoers (sudo visudo -f /etc/sudoers.d/pocketpanel)")
             lines.append("  TU_USUARIO ALL=(root) NOPASSWD: /usr/bin/apt update, /usr/bin/apt upgrade -y")
+        elif any("conffile prompt" in x for x in lines):
+            # Sin terminal dpkg no puede preguntar si quedarse con la configuración vieja o la nueva del paquete
+            lines.append("")
+            lines.append("un paquete pregunta qué hacer con su archivo de configuración: termínalo desde la terminal")
+            lines.append("  sudo dpkg --configure -a")
         elif rc is None:
             lines.append("(se cortó antes de terminar)")
     return {"status": status, "lines": lines[-300:]}
