@@ -1,4 +1,4 @@
-import { api, has, panel, setUnauthorizedHandler } from "./api.js";
+import { api, has, panel, setUnauthorizedHandler, toast } from "./api.js";
 import * as status from "./status.js";
 import * as services from "./services.js";
 import * as modulesView from "./modules.js";
@@ -18,8 +18,24 @@ function showLogin() {
   document.getElementById("pin").focus();
 }
 
+// Una pestaña abierta de antes de actualizar el panel tiene la interfaz vieja, que con datos nuevos puede salir mal.
+// Al cambiar de pestaña (como mucho una vez por minuto) se mira la versión y, si ha cambiado, se recarga: así nunca
+// se pierde algo a medias, porque ya te has ido de esa pantalla.
+let checkedAt = 0;
+async function staleUI() {
+  if (Date.now() - checkedAt < 60_000) return false;
+  checkedAt = Date.now();
+  try {
+    const { v } = await api("/api/version");
+    return v !== document.documentElement.dataset.v;
+  } catch {
+    return false;
+  }
+}
+
 function route() {
   if (location.hash === "#tour") return startTour();
+  staleUI().then((stale) => stale && location.reload());
   const name = (location.hash.slice(1).split("/")[0]) || "status";
   const view = views[name] ? name : "status";
   if (current && current !== view) { views[current].hide?.(); views[current].leave?.(); }
@@ -47,6 +63,7 @@ async function start(me) {
     initRunner();
     for (const v of Object.values(views)) v.init?.();
     for (const m of loaded) m.def.init?.();  // su vista, o engancharse a otras (Servicios…)
+    if (me.deps_pending?.length) toast(`Descargando lo que necesita ${me.deps_pending.join(", ")}: aparecerá al terminar (Módulos)`);
     Object.assign(views, moduleViews());
     window.addEventListener("hashchange", route);
     document.addEventListener("visibilitychange", () => {

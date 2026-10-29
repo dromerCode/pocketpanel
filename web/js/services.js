@@ -195,6 +195,10 @@ export function init() {
 
 export function show(args = []) {
   if (args[0] === "down" || filters[args[0]]) setFilter(args[0]);
+  if (args[0] === "open" && args[1]) {  // #services/open/<nombre>: su ficha (p. ej. desde Procesos)
+    const name = decodeURIComponent(args[1]);
+    (items.length ? Promise.resolve() : load()).then(() => { if (items.some((x) => x.name === name)) openSheet(name); });
+  }
   if (timer) return;
   load();
   for (const fn of showHooks) fn();

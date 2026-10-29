@@ -9,6 +9,7 @@ app/modules/weather/
 ├── __init__.py      manifest: what the module store shows and its options (always imported: keep it light)
 ├── api.py           setup(ctx) -> APIRouter (imported only when the module is on)
 ├── checks.py        optional: requirement checks for the "Comprobar requisitos" button
+├── requirements.txt optional: Python packages only this module needs (see below)
 ├── weather.py       your own logic, as many files as you like
 └── web/             optional: its part of the interface, served at /modules/weather/
     ├── index.js     what it adds to the app (see below)
@@ -66,6 +67,21 @@ What the core offers in `ctx`: `cfg`, `ssh` (run commands on the host), `docker`
 - leave an object for other modules (`ctx.backup = …`). Reading something no module left gives `None`, so
   `if ctx.backup:` is how a module checks whether another one is on.
 
+## Its own Python packages (`requirements.txt`)
+
+What only one module needs doesn't go in the image. List it, pinned, in the module's `requirements.txt`:
+
+```
+curl_cffi==0.16.3
+```
+
+When the module is switched on, the panel starts without it, downloads the packages in the background into
+`data/deps/<module>-<fingerprint>/` (with `pip --prefix`, so whatever the image already has is not downloaded
+again), and restarts itself to load the module; the module store shows the progress and lets you retry if it
+fails. It happens once: the folder survives restarts and image updates. Switching the module off, or changing the
+versions, removes the old folder on the next start. Import the packages inside the module's code as usual, but not
+in its `__init__.py` (the manifest is read even when the module is off).
+
 ## Requirement checks (`checks.py`)
 
 Both functions are optional:
@@ -104,8 +120,12 @@ export default {
 };
 ```
 
-- **Cards** go into a slot of the status screen (`left`, `right` or `bottom`). `init` runs once, `show` when
-  the status screen opens, `fast` every 5 s and `slow` every 30 s while it is visible.
+- **Cards** are widgets on the status screen. `slot` (`left`: after the history, `right`: after the disks,
+  `bottom`: at the end) and `order` only say where a card shows up the first time, and `size` its width in a
+  4-column grid (1 to 4; 2 by default, 4 for `bottom`; on a phone 1 is half the screen and the rest full width).
+  After that the user moves, resizes and hides them with ✎ (stored in `data/layout.json`, the same on every device).
+  The title in the organizer is `title`, or the card's first `.section-title`. `init` runs once, `show` when the status screen opens, `fast` every 5 s and
+  `slow` every 30 s while it is visible.
 - **A view** is an HTML fragment with a `<section class="view" data-view="<name>" hidden>`; with `tab` it also gets
   a button in the tab bar. It is reachable at `#<name>` (the module name, or `view.name`).
 - **Hooking into other screens**: `/js/services.js` exports `addFilter`, `addHeader`, `addInfo`,

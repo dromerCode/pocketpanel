@@ -1,5 +1,6 @@
 // Tienda de módulos: activar, desactivar y configurar sin tocar config.yml a mano.
 import { api, el, toast } from "./api.js";
+import { watchJob } from "./ui.js";
 
 const $ = (id) => document.getElementById(id);
 let data = null;
@@ -7,12 +8,22 @@ let data = null;
 /* ---------- Lista ---------- */
 
 async function load() {
+  const downloading = (data?.modules || []).filter((m) => depsBadge(m)?.[1] === "warn").map((m) => m.name);
   try {
     data = await api("/api/modules");
-    render();
   } catch (e) {
-    if (e.message !== "no autenticado") toast(`Módulos: ${e.message}`, true);
+    if (downloading.length) restarting();  // ha terminado y se está reiniciando
+    else if (e.message !== "no autenticado") toast(`Módulos: ${e.message}`, true);
+    return;
   }
+  if (downloading.length && data.modules.every((m) => !downloading.includes(m.name) || m.deps.ready)) restarting();
+  else render();
+}
+
+// Estado de las dependencias de un módulo activo: [texto de la insignia, clase] o null si no hay nada que contar
+function depsBadge(m) {
+  if (!m.enabled || !m.deps || m.deps.ready) return null;
+  return m.deps.status === "failed" ? ["Falló la descarga", "bad"] : ["Descargando…", "warn"];
 }
 
 function render() {
@@ -21,13 +32,39 @@ function render() {
     el("span", { class: "mod-icon" }, "⚙"),
     el("div", { class: "mod-card-desc" }, el("div", { class: "mod-card-title" }, "Ajustes generales"),
       `${g.name} · ${g.timezone} · aviso de disco al ${g.disk_alert_percent}%`)));
-  $("mod-grid").replaceChildren(...data.modules.map((m) => el("button", {
-    class: `mod-card ${m.enabled ? "on" : ""}`, onclick: () => openModule(m) },
+  $("mod-grid").replaceChildren(...data.modules.map((m) => {
+    const [label, cls] = depsBadge(m) || (m.enabled ? ["Activo", "ok"] : ["Inactivo", ""]);
+    return el("button", { class: `mod-card ${m.enabled ? "on" : ""}`, onclick: () => openModule(m) },
   el("div", { class: "mod-card-head" },
     el("span", { class: "mod-icon" }, m.icon),
-    el("span", { class: `badge ${m.enabled ? "ok" : ""}` }, m.enabled ? "Activo" : "Inactivo")),
+    el("span", { class: `badge ${cls}` }, label)),
   el("div", { class: "mod-card-title" }, m.title),
-  el("div", { class: "mod-card-desc" }, m.desc))));
+  el("div", { class: "mod-card-desc" }, m.desc));
+  }));
+  if (data.modules.some((m) => depsBadge(m)?.[1] === "warn")) {
+    clearTimeout(pollTimer);
+    pollTimer = setTimeout(load, 3000);  // al terminar, el panel se reinicia solo con el módulo cargado
+  }
+}
+let pollTimer = null;
+
+/* ---------- Dependencias ---------- */
+
+function depsSection(m) {
+  if (!m.deps) return null;
+  const st = depsBadge(m);
+  const text = st ? (st[1] === "bad" ? "La descarga falló." : "Descargando ahora; el módulo aparecerá al terminar.")
+    : m.enabled ? "Descargadas." : "Se descargan al activarlo (una sola vez) y se borran al desactivarlo.";
+  const watch = () => watchJob(`/api/deps/${m.name}`, `Dependencias de ${m.title}`,
+    { ok: ["Listo: reiniciando con el módulo…", true], failed: ["Falló la descarga", false] },
+    (j) => { if (j.status === "ok") restarting(); });
+  return el("div", {}, el("h2", { class: "section-title" }, "Descargas"),
+    el("p", { class: "muted small" }, `${m.deps.packages.join(", ")}. ${text}`),
+    m.deps.status ? el("button", { class: "btn btn-sm", onclick: watch }, "Ver descarga") : null,
+    st?.[1] === "bad" ? el("button", { class: "btn btn-sm", onclick: async () => {
+      await api(`/api/deps/${m.name}/retry`, { method: "POST" });
+      watch();
+    } }, "Reintentar") : null);
 }
 
 /* ---------- Formulario generado del catálogo ---------- */
@@ -138,6 +175,7 @@ function openModule(m) {
   sheet(m.icon, m.title, m.desc,
     el("div", { class: "switch-row" }, el("b", {}, "Activado"), enabled.node),
     fields.length ? el("div", { class: "form" }, fields.map(([, f]) => f.node)) : null,
+    depsSection(m),
     el("div", {}, el("h2", { class: "section-title" }, "Requisitos"), checks,
       el("button", { class: "btn btn-sm", onclick: runChecks }, "Comprobar requisitos")),
     error,
@@ -184,4 +222,8 @@ export function init() {
 
 export function show() {
   load();
+}
+
+export function hide() {
+  clearTimeout(pollTimer);
 }

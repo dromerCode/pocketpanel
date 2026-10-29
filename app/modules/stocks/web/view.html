@@ -1,0 +1,45 @@
+<section id="view-stocks" class="view" data-view="stocks" hidden>
+  <header class="topbar">
+    <h1>Bolsa</h1>
+    <div id="stk-range" class="seg">
+      <button class="seg-btn" data-range="dia">Día</button>
+      <button class="seg-btn" data-range="semana">Sem.</button>
+      <button class="seg-btn" data-range="mes">Mes</button>
+      <button class="seg-btn" data-range="anio">Año</button>
+    </div>
+  </header>
+  <div class="scroll pad">
+    <div class="card stk-hero">
+      <span class="card-label" id="stk-hero-label">Valor de tus posiciones</span>
+      <span class="stk-hero-value mono" id="stk-value">—</span>
+      <span class="card-sub" id="stk-sub">Cargando…</span>
+      <div id="stk-hero-chart" class="stk-chart stk-chart-big"></div>
+      <div class="stk-totals" id="stk-totals"></div>
+    </div>
+
+    <h2 class="section-title">En cartera <span id="stk-pos-count" class="muted"></span></h2>
+    <div id="stk-holdings" class="stk-grid"></div>
+
+    <h2 class="section-title">En seguimiento</h2>
+    <div id="stk-watch" class="stk-grid"></div>
+    <form id="stk-add" class="stk-add">
+      <input name="ticker" placeholder="Ticker (p. ej. AAPL)" autocapitalize="characters" autocomplete="off" spellcheck="false" required>
+      <input name="low" type="number" step="any" inputmode="decimal" placeholder="Zona € desde">
+      <input name="high" type="number" step="any" inputmode="decimal" placeholder="hasta">
+      <button class="btn btn-sm">Seguir</button>
+      <p class="muted small">Sin zona, se calcula sola (entre la media de 200 y la de 50 sesiones) si hay tendencia alcista.</p>
+    </form>
+
+    <h2 class="section-title stk-title-row">Descubrir
+      <span><button class="btn btn-sm" id="stk-disc-btn">Buscar</button>
+      <button class="btn btn-sm" id="stk-disc-more" hidden>Top 20</button></span></h2>
+    <div id="stk-discover" class="stk-grid"><p class="muted small">Revisa unas 50 grandes empresas (sin las que ya tienes o sigues) y las ordena de mejor a peor momento de entrada.</p></div>
+    <p class="muted small stk-note"><b>Zona de compra</b>: precio dentro de la zona técnica y valoración/analistas a favor. <b>Posible entrada</b>: solo lo dice la técnica, más débil.</p>
+
+    <h2 class="section-title">Vendidas</h2>
+    <ul id="stk-sold" class="stk-sold"></ul>
+
+    <p class="muted small stk-note">Datos de Yahoo Finance (se refrescan cada 5 min). Las recomendaciones salen de reglas fijas, no de una IA, y no son consejo financiero. Comprar y vender aquí solo lo apunta: la orden la das tú en tu bróker.</p>
+    <div class="btn-row"><button class="btn btn-sm" id="stk-digest">Mandar el resumen a Telegram ahora</button></div>
+  </div>
+</section>

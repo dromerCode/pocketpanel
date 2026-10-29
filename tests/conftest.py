@@ -1,5 +1,7 @@
 import os
+import sys
 import tempfile
+import types
 from pathlib import Path
 
 _tmp = tempfile.mkdtemp(prefix="pocketpanel-test-")
@@ -8,6 +10,16 @@ os.environ["PANEL_CONFIG"] = str(Path(__file__).parent / "fixtures" / "config_al
 os.environ["PANEL_DATA"] = f"{_tmp}/data"
 os.environ["PANEL_UPLOADS"] = f"{_tmp}/uploads"
 os.environ["PANEL_HOST_DIR"] = "/opt/pocketpanel"
+
+# curl_cffi es dependencia del módulo stocks (se descarga aparte, ver app/deps.py), no del núcleo: si no está en el
+# venv, un sustituto basta para montar el módulo (los tests de stocks le pasan su propia sesión falsa)
+try:
+    import curl_cffi  # noqa: F401
+except ImportError:
+    _stub = types.ModuleType("curl_cffi.requests")
+    _stub.AsyncSession = lambda **kw: None
+    sys.modules["curl_cffi"] = types.ModuleType("curl_cffi")
+    sys.modules["curl_cffi.requests"] = _stub
 
 import pytest  # noqa: E402
 

@@ -1,0 +1,42 @@
+/* Bolsa */
+#view-stocks .topbar .seg-btn { padding: 5px 9px; }
+#view-stocks .up { color: var(--accent); }
+#view-stocks .down { color: var(--danger); }
+.stk-hero { gap: 4px; }
+.stk-hero-value { font-size: 32px; font-weight: 700; letter-spacing: -.02em; }
+.stk-chart { margin-top: 8px; touch-action: pan-y; }
+.stk-chart svg { display: block; width: 100%; height: 56px; cursor: crosshair; }
+.stk-chart-big svg { height: 110px; }
+.stk-card-chart svg { height: 64px; cursor: inherit; }
+.stk-zone { fill: #4f8cff; opacity: .14; }
+.stk-mark { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; vector-effect: non-scaling-stroke; }
+.stk-cursor { stroke: var(--text); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.stk-totals, .stk-kv { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); font-size: 13px; }
+.stk-totals { margin-top: 10px; }
+.stk-totals b, .stk-kv b { color: var(--text); font-weight: 600; }
+.stk-totals .up b, .stk-kv .up b { color: var(--accent); }
+.stk-totals .down b, .stk-kv .down b { color: var(--danger); }
+.linklike { background: none; border: 0; padding: 0; font-weight: 600; cursor: pointer; text-decoration: underline dotted; }
+.stk-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr)); }
+.stk-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); min-width: 0; }
+.stk-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.stk-name { display: grid; min-width: 0; }
+.stk-name b { font-size: 16px; }
+.stk-head .badge { font-size: 11px; text-align: center; max-width: 58%; white-space: normal; line-height: 1.25; }
+.stk-price-row { display: flex; align-items: baseline; gap: 10px; }
+.stk-price { font-size: 20px; font-weight: 650; }
+.stk-chg { font-size: 13px; }
+.stk-why { font-size: 13px; color: var(--muted); }
+.stk-why summary { cursor: pointer; color: var(--text); }
+.stk-why ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 2px; font-size: 12px; }
+.stk-buy { display: flex; gap: 6px; min-width: 0; }
+.stk-buy .btn { flex: none; white-space: nowrap; }
+.stk-buy input, .stk-add input { min-width: 0; flex: 1; background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; font-size: 14px; }
+.stk-add { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; max-width: 560px; }
+.stk-add input[name="ticker"] { flex-basis: 100%; }
+.stk-add p { flex-basis: 100%; margin: 0; }
+.stk-title-row { display: flex; justify-content: space-between; align-items: center; }
+.stk-title-row .btn { text-transform: none; letter-spacing: 0; }
+.stk-note { margin: 10px 0; }
+.stk-sold { list-style: none; margin: 0; padding: 0; }
+.stk-sold li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }

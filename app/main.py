@@ -16,19 +16,25 @@ from . import auth, modules
 from .catalog import CATALOG, GENERAL, secret_keys
 from .config import Config, ConfigError, saved_values, settings
 from .config_writer import apply_changes
-from .core import json_body
+from .core import Shared, json_body
 from .authstore import ensure_secret, save_pin
 from .secrets import load_secrets, save_secrets
 from .core import Context, UnavailableError
+from .deps import Deps
 from .docker_api import DockerClient, DockerError
 from .history import HistoryDB
+from .layout import LayoutError, load_layout, save_layout
 from .monitor import Monitor
 from .push import PushService
 from .ssh import SSH, SSHError
-from .system import SYSTEM_SCRIPT, parse_system
+from .assets import IMMUTABLE, Assets, GzipJSON
+from .processes import ProcessError, Processes
+from .system import SystemSampler
 from .wsutil import until_disconnect
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+# httpx apunta cada petición con la URL entera, y la de Telegram lleva el token del bot (bot<token>/sendMessage)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 for noisy in ("httpx", "asyncssh"):
     logging.getLogger(noisy).setLevel(logging.WARNING)
 
@@ -44,7 +50,17 @@ def _restart() -> None:
 PIN_RE = re.compile(r"^\d{4,12}$")
 
 
-def create_app(cfg: Config, restart=None) -> FastAPI:
+class Static(StaticFiles):
+    """Sin Cache-Control el navegador se queda con la versión vieja horas (caché heurística) tras actualizar el panel:
+    así revalida siempre, y si no ha cambiado es un 304 de nada."""
+
+    def file_response(self, *args, **kwargs):
+        r = super().file_response(*args, **kwargs)
+        r.headers["Cache-Control"] = "no-cache"
+        return r
+
+
+def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
     restart = restart or _restart
     Path(cfg.data_dir).mkdir(parents=True, exist_ok=True)
     if not cfg.secret:
@@ -52,19 +68,43 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
     ctx = Context(cfg=cfg, ssh=SSH(cfg.ssh_host, cfg.ssh_user, cfg.ssh_key, cfg.known_hosts, cfg.ssh_port),
                   docker=DockerClient(cfg.docker_sock), push=PushService(cfg.data_dir, cfg.push_contact))
     ctx.history = HistoryDB(f"{cfg.data_dir}/history.db")
+    ctx.deps = deps or Deps(cfg.data_dir)
+    ctx.deps.prune([m for m in modules.MODULES if cfg.enabled(m)])
     routers = modules.load(ctx)
-    ctx.monitor = Monitor(cfg, ctx.ssh, ctx.docker, ctx.history, ctx.push, hooks=ctx.hooks)
+    ctx.sampler = SystemSampler(ctx.ssh, ctx.docker, cfg.disks)
+    ctx.monitor = Monitor(cfg, ctx.ssh, ctx.docker, ctx.history, ctx.push, hooks=ctx.hooks, sampler=ctx.sampler)
+    loaded = lambda m: cfg.enabled(m) and m not in ctx.deps_pending  # noqa: E731
+    installing: dict[str, asyncio.Task] = {}
+
+    async def install_deps(names: list[str]) -> None:
+        """Descarga lo que falte y reinicia para cargar los módulos (cuando nada impida reiniciar)."""
+        ok = True
+        for name in names:
+            ok = (await ctx.deps.install(name)).status == "ok" and ok
+        if not ok:
+            return
+        while ctx.busy():
+            await asyncio.sleep(10)
+        restart()
+
+    def start_install(names: list[str]) -> None:
+        names = [n for n in names if not (installing.get(n) and not installing[n].done())]
+        if names:
+            t = asyncio.create_task(install_deps(names))
+            installing.update({n: t for n in names})
 
     @asynccontextmanager
     async def lifespan(app):
         task = asyncio.create_task(ctx.monitor.run())
+        start_install(ctx.deps_pending)
         yield
         task.cancel()
+        for t in installing.values():
+            t.cancel()
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
     app.state.cfg, app.state.ctx = cfg, ctx
     authed = [Depends(auth.require_auth)]
-    cpu_prev = {}
 
     @app.exception_handler(SSHError)
     @app.exception_handler(DockerError)
@@ -100,25 +140,43 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
 
     @app.get("/api/me", dependencies=authed)
     async def me():
-        enabled = [m for m in modules.MODULES if cfg.enabled(m)]
+        enabled = [m for m in modules.MODULES if loaded(m)]
         return {"name": cfg.name, "modules": enabled, "ui": [m for m in enabled if modules.web_dir(m)],
-                **{k: v for k, v in ctx.info.items() if k in enabled}}
+                "deps_pending": ctx.deps_pending, **{k: v for k, v in ctx.info.items() if k in enabled}}
 
     @app.get("/api/system", dependencies=authed)
     async def system():
-        out, containers = await asyncio.gather(ctx.ssh.run(SYSTEM_SCRIPT), ctx.docker.containers())
-        r, cpu_prev["v"] = parse_system(out, cpu_prev.get("v"), cfg.disks)
+        r, containers = await ctx.sampler.sample()
+        r = dict(r)
         up = sum(1 for c in containers if c["State"] == "running")
         r["containers"] = {"up": up, "down": len(containers) - up}
         return r
 
-    @app.get("/api/containers", dependencies=authed)
-    async def containers():
+    procs = Processes(ctx.ssh, ctx.docker)
+
+    @app.get("/api/processes", dependencies=authed)
+    async def processes(sort: str = "cpu", q: str = ""):
+        return await procs.sample(sort, q)
+
+    @app.post("/api/processes/{pid}/{sig}", dependencies=authed)
+    async def process_signal(pid: int, sig: str):
+        try:
+            await procs.signal(pid, sig.upper())
+        except ProcessError as e:
+            raise HTTPException(400, str(e))
+        return {"ok": True}
+
+    async def _services():
         from .services import build_services
         cs = await ctx.docker.containers()
         stats = await ctx.docker.stats([c["Id"] for c in cs if c["State"] == "running"])
-        out = build_services(cs, stats, cfg.services)
+        return build_services(cs, stats, cfg.services)
+    services_now = Shared(_services)  # una consulta a Docker por contenedor, compartida entre pantallas
+
+    @app.get("/api/containers", dependencies=authed)
+    async def containers():
         u = ctx.updater
+        out = [dict(svc) for svc in await services_now.get()]
         for svc in out:
             svc["update"] = bool(u) and u.results.get(svc["name"], {}).get("status") == "update"
             job = u.jobs.get(svc["name"]) if u else None
@@ -130,12 +188,24 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
         if verb in ("stop", "restart"):
             ctx.monitor.alerts.user_stopped(name, time.time())
         await ctx.docker.action(name, verb)
+        services_now.invalidate()
         return {"ok": True}
 
     @app.get("/api/history", dependencies=authed)
     async def get_history(range: str = "1h"):
         span, bucket = RANGES.get(range, RANGES["1h"])
         return ctx.history.query(since=int(time.time()) - span, bucket=bucket)
+
+    @app.get("/api/layout", dependencies=authed)
+    async def get_layout():
+        return load_layout(cfg.data_dir)
+
+    @app.put("/api/layout", dependencies=authed)
+    async def put_layout(request: Request):
+        try:
+            return save_layout(cfg.data_dir, (await json_body(request)).get("widgets"))
+        except LayoutError as e:
+            raise HTTPException(400, str(e))
 
     @app.get("/api/push/key", dependencies=authed)
     async def push_key():
@@ -231,7 +301,8 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
         secrets = load_secrets(cfg.data_dir).get(name, {})
         for k in secret_keys(name):
             values[k] = {"set": bool(secrets.get(k))}
-        return {"name": name, **CATALOG[name], "enabled": cfg.enabled(name), "values": values}
+        return {"name": name, **CATALOG[name], "enabled": cfg.enabled(name), "values": values,
+                "deps": ctx.deps.view(name)}
 
     @app.get("/api/modules", dependencies=authed)
     async def list_modules():
@@ -282,6 +353,20 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
             values.setdefault("jfa_pass", cfg.jfa_pass)
         return await check_module(name, values, ctx.ssh)
 
+    @app.get("/api/deps/{name}", dependencies=authed)
+    async def deps_job(name: str):
+        job = ctx.deps.jobs.get(name)
+        if not job:
+            raise HTTPException(404, "no hay ninguna descarga de ese módulo")
+        return job.view()
+
+    @app.post("/api/deps/{name}/retry", dependencies=authed)
+    async def deps_retry(name: str):
+        if name not in ctx.deps_pending:
+            raise HTTPException(409, "ese módulo no está esperando dependencias")
+        start_install([name])
+        return {"ok": True}
+
     @app.put("/api/settings", dependencies=authed)
     async def save_settings(request: Request):
         b = await json_body(request)
@@ -307,10 +392,32 @@ def create_app(cfg: Config, restart=None) -> FastAPI:
 
     for r in routers:
         app.include_router(r)
-    for name in modules.MODULES:  # la interfaz de cada módulo activo, que el navegador carga bajo demanda
-        if cfg.enabled(name) and (d := modules.web_dir(name)):
-            app.mount(f"/modules/{name}", StaticFiles(directory=d), name=f"module-{name}")
-    app.mount("/", StaticFiles(directory=cfg.web_dir, html=True, check_dir=False), name="web")
+    # La interfaz, con versión en la URL y comprimida (assets.py); lo de sin versión queda para sw.js, iconos…
+    mod_dirs = {n: d for n in modules.MODULES if loaded(n) and (d := modules.web_dir(n))}
+    assets = Assets(cfg.web_dir, mod_dirs)
+
+    @app.get("/", include_in_schema=False)
+    @app.get("/index.html", include_in_schema=False)
+    async def index(request: Request):
+        return assets.index(request.headers)
+
+    @app.get("/api/version", include_in_schema=False)
+    async def version():
+        """La versión de la interfaz: una pestaña abierta de antes de actualizar ve que no es la suya y se recarga."""
+        return {"v": assets.version()}
+
+    @app.get("/v/{ver}/{path:path}", include_in_schema=False)
+    async def versioned(ver: str, path: str, request: Request):
+        f = assets.resolve(path)
+        if not f:
+            raise HTTPException(404)
+        # Una versión que no es la actual (una pestaña abierta de antes de actualizar): lo de ahora, sin guardarlo
+        return assets.response(f, request.headers, IMMUTABLE if ver == assets.version() else "no-cache")
+
+    app.add_middleware(GzipJSON)
+    for name, d in mod_dirs.items():
+        app.mount(f"/modules/{name}", Static(directory=d), name=f"module-{name}")
+    app.mount("/", Static(directory=cfg.web_dir, html=True, check_dir=False), name="web")
     return app
 
 

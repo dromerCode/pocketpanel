@@ -1,5 +1,5 @@
 """Registro de módulos: cada subcarpeta con un `MODULE` en su __init__.py es un módulo (ver app/module.py).
-Solo se importa el api.py de los que están activos en config.yml."""
+Solo se importa el api.py de los que están activos en config.yml (y tienen ya sus dependencias, ver app/deps.py)."""
 import dataclasses
 import importlib
 import pkgutil
@@ -46,8 +46,18 @@ def load_order() -> list[str]:
 
 
 def load(ctx) -> list:
-    return [importlib.import_module(f"{__name__}.{name}.api").setup(ctx)
-            for name in load_order() if ctx.cfg.enabled(name)]
+    """Monta los módulos activos. Los que aún no tienen sus dependencias quedan en ctx.deps_pending."""
+    routers = []
+    for name in load_order():
+        if not ctx.cfg.enabled(name):
+            continue
+        if ctx.deps and not ctx.deps.ready(name):
+            ctx.deps_pending.append(name)
+            continue
+        if ctx.deps:
+            ctx.deps.activate(name)
+        routers.append(importlib.import_module(f"{__name__}.{name}.api").setup(ctx))
+    return routers
 
 
 def checks(name: str):

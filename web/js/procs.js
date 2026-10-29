@@ -1,0 +1,100 @@
+// El widget Procesos de Estado: cerrado no pide nada; abierto pide /api/processes cada 5 s. Se cierra solo al salir
+// de Estado (o al dejar la app en segundo plano), así no queda nada leyendo /proc a escondidas.
+import { api, el, fmtBytes, toast } from "./api.js";
+
+const $ = (id) => document.getElementById(id);
+const EVERY = 5000;
+let timer = null;
+let sort = "cpu";
+let busy = false;
+let qTimer = null;
+let openPid = null;  // el proceso desplegado (con su orden entera y los botones), que sigue así al refrescar
+let last = null;
+
+const isOpen = () => $("pr-toggle").getAttribute("aria-expanded") === "true";
+const cpuLevel = (pct) => (pct >= 90 ? "bad" : pct >= 40 ? "warn" : "");  // 100 % = un núcleo
+
+async function signal(p, sig) {
+  const what = sig === "KILL" ? "Forzar el cierre de" : "Terminar";
+  if (!confirm(`¿${what} ${p.name} (${p.pid})?`)) return;
+  try {
+    await api(`/api/processes/${p.pid}/${sig}`, { method: "POST" });
+    toast(`${p.name}: ${sig === "KILL" ? "cerrado a la fuerza" : "se le ha pedido que termine"}`);
+    openPid = null;
+    load();
+  } catch (e) {
+    toast(`${p.name}: ${e.message}`, true);
+  }
+}
+
+function row(p) {
+  const open = p.pid === openPid;
+  const meta = [`${p.pid}`, p.user, p.container && el("b", { class: "pr-ctr" }, p.container), p.cmd]
+    .filter(Boolean).flatMap((x, i) => (i ? [" · ", x] : [x]));
+  return el("li", { class: `pr-row${open ? " open" : ""}`, onclick: (e) => {
+    if (e.target.closest("button, a")) return;
+    openPid = open ? null : p.pid;
+    render(last);
+  } },
+  el("span", { class: "pr-name" }, p.name),
+  el("span", { class: `pr-cpu mono ${p.cpu == null ? "" : cpuLevel(p.cpu)}` }, p.cpu == null ? "…" : `${p.cpu.toFixed(1)}%`),
+  el("span", { class: "pr-mem mono" }, fmtBytes(p.mem)),
+  el("span", { class: "pr-cmd mono" }, ...meta),
+  open ? el("div", { class: "pr-acts" },
+    p.container && el("a", { class: "btn btn-sm", href: `#services/open/${encodeURIComponent(p.container)}` }, `Contenedor ${p.container}`),
+    el("button", { class: "btn btn-sm", type: "button", onclick: () => signal(p, "TERM") }, "Terminar"),
+    el("button", { class: "btn btn-sm pr-danger", type: "button", onclick: () => signal(p, "KILL") }, "Forzar")) : null);
+}
+
+function render(d) {
+  if (!d) return;
+  last = d;
+  $("pr-sum").textContent = d.shown < d.count ? `${d.shown} de ${d.count}` : `${d.count} procesos`;
+  const rows = d.procs.map(row);
+  $("pr-list").replaceChildren(...(rows.length ? rows : [el("li", { class: "pr-empty muted" }, "Nada coincide")]));
+}
+
+async function load() {
+  if (busy) return;  // con el host lento no se apilan peticiones
+  busy = true;
+  try {
+    const q = $("pr-q").value.trim();
+    const d = await api(`/api/processes?sort=${sort}${q ? `&q=${encodeURIComponent(q)}` : ""}`);
+    if (isOpen()) render(d);
+  } catch (e) {
+    if (e.message !== "no autenticado") toast(`Procesos: ${e.message}`, true);
+  } finally {
+    busy = false;
+  }
+}
+
+function setOpen(open) {
+  $("pr-toggle").setAttribute("aria-expanded", String(open));
+  $("pr-body").hidden = !open;
+  clearInterval(timer);
+  timer = null;
+  if (open) {
+    $("pr-sum").textContent = "midiendo…";
+    load();
+    timer = setInterval(load, EVERY);
+  } else {
+    $("pr-list").replaceChildren();
+    openPid = last = null;
+  }
+}
+
+export function initProcs() {
+  $("pr-toggle").onclick = () => setOpen(!isOpen());
+  for (const b of document.querySelectorAll("#pr-sort .pr-sort")) {  // las cabeceras de CPU y RAM ordenan
+    b.onclick = () => {
+      sort = b.dataset.sort;
+      for (const x of document.querySelectorAll("#pr-sort .pr-sort")) x.classList.toggle("on", x === b);
+      load();
+    };
+  }
+  $("pr-q").oninput = () => { clearTimeout(qTimer); qTimer = setTimeout(load, 300); };
+}
+
+export function closeProcs() {
+  if (isOpen()) setOpen(false);
+}

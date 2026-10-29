@@ -6,9 +6,10 @@ const $ = (id) => document.getElementById(id);
 function steps() {
   const tab = (t) => `.tabbar a[data-tab="${t}"]`;
   return [
-    { sel: "#view-status .cards", title: "Tu servidor de un vistazo",
+    { sel: '#st-grid > .w[data-w="cpu"]', title: "Tu servidor de un vistazo",
       text: "CPU, RAM, temperatura y contenedores en marcha. Toca «Contenedores» para ir a ellos." },
     { sel: "#charts", title: "Historial", text: "Cómo ha ido la última hora, el último día o la última semana." },
+    { sel: "#st-edit", title: "Organizar", text: "Mueve, ensancha u oculta cada recuadro de esta pantalla. Se guarda en el servidor: el móvil y el PC lo ven igual." },
     { sel: "#push-btn", title: "Avisos", text: "Actívalos aquí y te llegará una notificación si algo se para, se llena un disco o falla un backup.",
       action: ["Activar avisos", () => $("push-btn").click()] },
     { sel: 'a[href="#modules"]', title: "Módulos", text: "Aquí activas o configuras lo que quieras (backups, Claude, descargas…) y cambias el nombre del servidor. También puedes repetir este tutorial." },

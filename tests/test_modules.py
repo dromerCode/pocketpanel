@@ -4,6 +4,7 @@ from starlette.websockets import WebSocketDisconnect
 
 from app import auth
 from app.config import load_config
+from app.deps import Deps
 from app.main import create_app
 from app.modules import MODULES
 
@@ -15,6 +16,9 @@ modules:
   sites: {enabled: true}
   downloads: {enabled: true, qbittorrent_url: 'http://127.0.0.1:1'}
   jellyfin: {enabled: true}
+  stocks: {enabled: true}
+  files: {enabled: true}
+  packages: {enabled: true}
 """
 NONE = """
 name: casa-ramon
@@ -25,13 +29,22 @@ modules:
 """
 
 
-def client(tmp_path, yml):
+class ReadyDeps(Deps):
+    """Como si las dependencias de cada módulo ya estuvieran descargadas (en los tests vienen del venv)."""
+    def ready(self, name):
+        return True
+
+    def activate(self, name):
+        pass
+
+
+def client(tmp_path, yml, deps=None):
     p = tmp_path / "config.yml"
     p.write_text(yml)
     cfg = load_config(str(p), {"PANEL_PIN_HASH": auth.hash_pin("1234"), "PANEL_SECRET": "s",
                                "PANEL_DATA": str(tmp_path / "data"), "PANEL_UPLOADS": str(tmp_path / "up"),
                                "PANEL_HOST_DIR": "/opt/pocketpanel"})
-    c = TestClient(create_app(cfg))
+    c = TestClient(create_app(cfg, deps=deps or ReadyDeps(cfg.data_dir)))
     assert c.post("/api/login", json={"pin": "1234"}).status_code == 200
     return c
 
@@ -46,7 +59,7 @@ def test_me_lists_enabled_modules(tmp_path):
 def test_core_only(tmp_path):
     c = client(tmp_path, NONE)
     me = c.get("/api/me").json()
-    assert me == {"name": "casa-ramon", "modules": [], "ui": []}
+    assert me == {"name": "casa-ramon", "modules": [], "ui": [], "deps_pending": []}
 
 
 @pytest.mark.parametrize("path", ["/api/raid", "/api/actions", "/api/backup", "/api/updates", "/api/report",
@@ -83,3 +96,18 @@ def test_containers_hide_update_flags_without_updates(tmp_path, monkeypatch):
     monkeypatch.setattr(ctx.docker, "stats", stats)
     svc = c.get("/api/containers").json()[0]
     assert svc["name"] == "web" and svc["update"] is False
+
+
+def test_static_always_revalidated(tmp_path):
+    """Tras actualizar el panel el navegador no puede seguir con el JS viejo de su caché."""
+    c = client(tmp_path, ALL)
+    for path in ("/js/main.js", "/modules/terminal/vendor/xterm.js"):
+        r = c.get(path)
+        assert r.status_code == 200 and r.headers["cache-control"] == "no-cache"
+        assert c.get(path, headers={"if-none-match": r.headers["etag"]}).status_code == 304
+
+
+def test_no_cdn_for_core_modules():
+    """El terminal no puede depender de que el móvil llegue a una CDN (algunos no llegan)."""
+    from pathlib import Path
+    assert "https://" not in Path("app/modules/terminal/web/index.js").read_text()

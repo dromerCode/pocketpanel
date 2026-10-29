@@ -23,6 +23,9 @@ modules:
     enabled: true
     check_at: "05:30"
 
+  packages:                    # paquetes del sistema (apt) por actualizar y actualizarlos desde Estado
+    enabled: false             # en sudoers, sin contraseña: /usr/bin/apt update, /usr/bin/apt upgrade -y
+
   claude:                      # chat con Claude Code en el host + informe diario por push
     enabled: false             # necesita `claude` instalado y con sesión iniciada en el servidor
     home: ""                   # HOME con el que usas claude; vacío = el de tu usuario
@@ -51,6 +54,10 @@ modules:
     ssh_options: ""
     sudo: false                # en local: usar `sudo -n` para mdadm/smartctl (necesita regla en sudoers)
 
+  files:                       # gestor de archivos del host por SFTP (el mismo SSH): copiar/pegar, subir, descargar…
+    enabled: false
+    roots: ["~"]               # lo único que se puede ver y tocar; p. ej. ["~", "/mnt"]
+
   sites:                       # webs que deben responder + días que le quedan al certificado, con avisos
     enabled: false
     urls: []                   # ["https://midominio.com", "http://127.0.0.1:8096"]
@@ -63,6 +70,16 @@ modules:
     sonarr_url: ""             # http://127.0.0.1:8989
     radarr_url: ""             # http://127.0.0.1:7878
     notify_finished: true      # aviso push cuando termina una descarga
+
+  stocks:                      # cartera de bolsa: recomendaciones por reglas, seguimiento y avisos por Telegram
+    enabled: false             # al activarlo descarga curl_cffi (~38 MB, en data/deps); al apagarlo se borra
+    broker: Trade Republic
+    max_positions: 3
+    commission: "1"            # € por operación: se descuenta del efectivo
+    alerts: true               # avisar cuando cambie una recomendación
+    alert_every: 30            # minutos
+    digest_at: "07:00"         # resumen diario por Telegram (null: sin resumen)
+    telegram_chat: ""          # el token del bot se pone desde la app (se guarda aparte, en data/)
 
   jellyfin:                    # cuentas e invitaciones de Jellyfin a través de jfa-go
     enabled: false             # usuario/contraseña de jfa-go: desde la app (se guardan aparte, en data/)
