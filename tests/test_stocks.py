@@ -317,3 +317,11 @@ def test_module_waits_for_its_deps_then_restarts(tmp_path):
             asyncio.run(asyncio.sleep(0.02))
         assert deps.installed == ["stocks"] and restarts == [1]
         assert c.get("/api/deps/stocks").json()["status"] == "ok"
+
+
+def test_httpx_does_not_log_the_telegram_token():
+    # httpx apunta en INFO la URL de cada petición, y la de Telegram lleva el token del bot
+    import logging
+
+    import app.main  # noqa: F401
+    assert logging.getLogger("httpx").getEffectiveLevel() >= logging.WARNING

@@ -25,7 +25,7 @@ function render(p) {
   const up = $("pkg-up");
   up.hidden = !p.count && !p.running;
   up.textContent = p.running ? "Ver progreso" : `Actualizar (${p.count})`;
-  up.onclick = () => (p.running ? watch() : run(true));
+  up.onclick = () => (p.running ? watch() : run(true, p.count));
   $("pkg-check").disabled = p.running;
   $("pkg-check").onclick = () => run(false);
 }
@@ -45,7 +45,9 @@ function watch(title = "Paquetes del sistema") {
   watchJob("/api/packages/job", title, DONE, () => loadPackages(true));
 }
 
-async function run(upgrade) {
+async function run(upgrade, count) {
+  // Buscar no cambia nada; actualizar sí (y en el móvil se toca sin querer), como al actualizar contenedores
+  if (upgrade && !confirm(`¿Actualizar ${count} paquetes del sistema (sudo apt upgrade -y)?`)) return;
   try {
     await api("/api/packages/run", { method: "POST", body: { upgrade } });
     watch(upgrade ? "Actualizando paquetes" : "Buscando actualizaciones");

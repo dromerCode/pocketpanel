@@ -33,6 +33,8 @@ from .system import SystemSampler
 from .wsutil import until_disconnect
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+# httpx apunta cada petición con la URL entera, y la de Telegram lleva el token del bot (bot<token>/sendMessage)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 for noisy in ("httpx", "asyncssh"):
     logging.getLogger(noisy).setLevel(logging.WARNING)
 
