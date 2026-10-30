@@ -1,6 +1,16 @@
 /* Terminal */
-.term { flex: 1; min-height: 0; padding: 6px 4px 0 6px; background: #0a0b0c; }
+.term { flex: 1; min-height: 0; position: relative; background: #0a0b0c; }
+.term-pane { position: absolute; inset: 6px 4px 0 6px; }
 .term .xterm { height: 100%; }
+.term-bar { gap: 6px; }
+.term-tabs { flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.term-tab { flex: none; display: flex; align-items: center; gap: 2px; max-width: 200px; padding: 0 2px 0 10px; height: 32px;
+  border: 1px solid var(--line); border-radius: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.term-tab.on { background: var(--surface-2); color: var(--text); border-color: var(--accent); }
+.term-tab.dead .term-tab-name { text-decoration: line-through; opacity: .6; }
+.term-tab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+.term-tab-x { width: 26px; height: 26px; padding: 0; border: 0; background: none; color: inherit; font-size: 16px; cursor: pointer; border-radius: 6px; }
+.term-tab-x:hover { background: var(--surface); }
 .keys {
   flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 6px 8px;
   background: var(--surface); border-top: 1px solid var(--line);
@@ -11,7 +21,6 @@
   font-family: var(--mono); font-size: 14px; cursor: pointer;
 }
 .keys button.on { background: var(--accent); color: var(--accent-ink); }
-#term-label { flex: 1; text-align: right; }
 @media (hover: hover) and (pointer: fine) {
   .keys { display: none; }
 }
