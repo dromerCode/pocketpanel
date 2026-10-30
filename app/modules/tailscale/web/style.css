@@ -1,0 +1,9 @@
+.ts { padding: 6px 14px; }
+.ts-list { list-style: none; margin: 0; padding: 0; }
+.ts-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.ts-list li:first-child { border-top: 0; }
+.ts-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.ts-me { margin-left: 6px; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
+.ts-ip { font-size: 12px; color: var(--muted); }
+.ts-sub { grid-column: 2 / -1; font-size: 12px; color: var(--muted); margin-top: -4px; }
+.ts-list li.off .ts-name { color: var(--muted); }

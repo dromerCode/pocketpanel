@@ -1,10 +1,8 @@
 <section id="view-terminal" class="view" data-view="terminal" hidden>
-  <header class="topbar">
-    <div class="seg">
-      <button class="seg-btn active" data-mode="shell">Shell</button>
-      <button class="seg-btn" data-mode="tmux" data-module="claude">tmux claude</button>
-    </div>
-    <span id="term-label" class="muted mono small"></span>
+  <header class="topbar term-bar">
+    <div id="term-tabs" class="term-tabs" role="tablist" aria-label="Sesiones"></div>
+    <button id="term-new" class="icon-btn" title="Nueva sesión" aria-label="Nueva sesión">+</button>
+    <button id="term-tmux" class="btn btn-sm" data-module="claude" title="tmux con Claude">tmux claude</button>
     <button id="term-reconnect" class="icon-btn" title="Reconectar" aria-label="Reconectar">↻</button>
   </header>
   <div id="term" class="term"></div>

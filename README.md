@@ -21,7 +21,10 @@ only what you use.
 Always on:
 
 - **Status**: CPU, RAM, temperature, disks, uptime and 1 h / 24 h / 7 d history charts.
-- **Containers**: list, start / stop / restart, live logs, open button for each web UI.
+- **Disk health** (SMART): a light per disk, alerts when something gets worse (bad sectors, cable errors, heat, a
+  failed self-test) and scheduled self-tests. Needs passwordless `sudo smartctl`; it never wakes a sleeping disk.
+- **Containers and system services**: list, start / stop / restart, live logs, open button for each web UI. Below
+  the containers, the systemd services you installed or that are running (not the OS plumbing), and any failed one.
 - **Push alerts** (Web Push): a container stops, a disk fills up, a module reports a problem.
 - PIN login with rate limiting, installable as an app on Android / iOS.
 
@@ -29,7 +32,7 @@ Optional modules, turned on and configured from the app itself (**Status → ⚙
 
 | Module | What it does | Needs on the host |
 |---|---|---|
-| `terminal` (on) | Full terminal (bash, tmux) on the host over SSH | `tmux` for tmux mode |
+| `terminal` (on) | Full terminal (bash, tmux) on the host over SSH, several sessions in tabs | `tmux` for tmux mode |
 | `actions` (on) | One-tap buttons that run your own commands (`actions.yml`) | – |
 | `updates` (on) | Daily check for newer images, one-tap update with automatic rollback if the new container doesn't come up | – |
 | `packages` | System packages (apt) waiting for an update, with security ones and a pending reboot flagged; check and upgrade from Estado. The upgrade runs detached on the host, so it survives the panel restarting (e.g. when Docker itself is upgraded) | passwordless `sudo apt update` and `sudo apt upgrade -y` (`user ALL=(root) NOPASSWD: /usr/bin/apt update, /usr/bin/apt upgrade -y`) |
@@ -37,6 +40,7 @@ Optional modules, turned on and configured from the app itself (**Status → ⚙
 | `backups` | Nightly incremental backups (rsync + hardlinks) of a folder to another machine over SSH, restore one app's folder from the container sheet | `rsync` on both ends |
 | `raid` | mdadm RAID state + SMART (local or on another box over SSH) | `mdadm`, `smartctl` |
 | `files` | Lightweight file manager over SFTP (the same SSH connection): browse, multi-select, copy/cut and paste between folders, rename, delete, upload (drag and drop), download (folders as `.tar`), preview images/video/audio/PDF and edit text files. Limited to the folders you list | – |
+| `tailscale` | Your tailnet's devices on Estado, with a light for online/offline, their IP and when they were last seen. Read-only (`tailscale status`) | Tailscale |
 | `sites` | Checks that your websites answer and how many days their TLS certificate has left; push alert when one goes down, comes back or is about to expire | – |
 | `downloads` | qBittorrent (pause/resume, speeds, ETA), Sonarr/Radarr queue and what airs in the next 7 days; push when a download finishes or *arr reports a problem | qBittorrent / Sonarr / Radarr |
 | `jellyfin` | Manage Jellyfin accounts and invites through [jfa-go](https://github.com/hrfee/jfa-go) | jfa-go |

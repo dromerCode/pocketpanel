@@ -146,7 +146,16 @@ a { color: inherit; }
 .section-title { display: block; margin: 22px 0 10px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .disks { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .disk-row { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; margin-bottom: 5px; }
-.disk-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.disk-name { flex: none; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.disk-row .disk-num { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.light { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); opacity: .6; vertical-align: 1px; flex: none; }
+.light.ok { background: var(--accent); opacity: 1; box-shadow: 0 0 6px color-mix(in srgb, var(--accent) 60%, transparent); }
+.light.warn { background: var(--warn); opacity: 1; box-shadow: 0 0 6px color-mix(in srgb, var(--warn) 60%, transparent); }
+.light.bad { background: var(--danger); opacity: 1; box-shadow: 0 0 6px color-mix(in srgb, var(--danger) 60%, transparent); }
+.disk-other .disk-row { margin: 0; }
+.hd { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.hd-head { display: flex; align-items: center; gap: 8px; }
+.hd-problems { margin: 0; padding-left: 18px; font-size: 13px; }
 .disk-num { flex: none; color: var(--muted); font-size: 12px; }
 
 /* Procesos (Estado) */
@@ -203,6 +212,11 @@ a { color: inherit; }
 .svc-stats { flex: none; text-align: right; font-size: 12px; color: var(--muted); }
 .dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--accent); }
 .dot.off { background: var(--danger); }
+.svc-sep { display: flex; align-items: center; gap: 10px; margin: 14px 4px 4px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.svc-sep::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.svc-unit-icon { display: grid; place-items: center; font-size: 18px; color: var(--muted); }
+#sheet.is-unit .mod-sheet-btn { display: none !important; }  /* actualizar, backups…: cosa de contenedores */
+.svc-tag { flex: none; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 99px; background: var(--surface-2); color: var(--muted); }
 .empty { padding: 40px 16px; text-align: center; color: var(--muted); }
 
 /* Ficha */
@@ -382,6 +396,9 @@ a { color: inherit; }
 }
 .form textarea:focus { border-color: var(--accent); }
 .form .help { font-size: 12px; color: var(--muted); opacity: .85; }
+.form .suggest { font-size: 12px; color: var(--accent); overflow-wrap: anywhere; }
+.suggest-use { margin-left: 4px; padding: 1px 8px; border: 1px solid var(--accent); border-radius: 99px; background: none; color: var(--accent); font-size: 12px; cursor: pointer; }
+.suggest-status { margin: 0; }
 .form label.inline { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
 .checks li { display: grid; grid-template-columns: 22px 1fr; gap: 2px 6px; }
