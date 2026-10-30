@@ -29,7 +29,7 @@ Optional modules, turned on and configured from the app itself (**Status → ⚙
 
 | Module | What it does | Needs on the host |
 |---|---|---|
-| `terminal` (on) | Full terminal (bash, tmux) on the host over SSH | `tmux` for tmux mode |
+| `terminal` (on) | Full terminal (bash, tmux) on the host over SSH, several sessions in tabs | `tmux` for tmux mode |
 | `actions` (on) | One-tap buttons that run your own commands (`actions.yml`) | – |
 | `updates` (on) | Daily check for newer images, one-tap update with automatic rollback if the new container doesn't come up | – |
 | `packages` | System packages (apt) waiting for an update, with security ones and a pending reboot flagged; check and upgrade from Estado. The upgrade runs detached on the host, so it survives the panel restarting (e.g. when Docker itself is upgraded) | passwordless `sudo apt update` and `sudo apt upgrade -y` (`user ALL=(root) NOPASSWD: /usr/bin/apt update, /usr/bin/apt upgrade -y`) |

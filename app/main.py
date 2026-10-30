@@ -262,6 +262,16 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
             raise HTTPException(404, "módulo desconocido")
         return await check_module(name, {**saved_values(cfg.config_path, name), **(b.get("values") or {})}, ctx.ssh)
 
+    @app.post("/api/setup/suggest/{name}")
+    async def setup_suggest(name: str, request: Request):
+        from .suggest import suggest_module
+        if cfg.pin_hash:
+            raise HTTPException(409, "ya está configurado")
+        _setup_code(request, str((await json_body(request)).get("code", "")))
+        if name not in CATALOG:
+            raise HTTPException(404, "módulo desconocido")
+        return await suggest_module(name, ctx.ssh, ctx.docker)
+
     @app.post("/api/setup")
     async def setup_done(request: Request, response: Response):
         b = await json_body(request)
@@ -352,6 +362,14 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
             values.setdefault("jfa_user", cfg.jfa_user)
             values.setdefault("jfa_pass", cfg.jfa_pass)
         return await check_module(name, values, ctx.ssh)
+
+    @app.get("/api/modules/{name}/suggest", dependencies=authed)
+    async def suggest(name: str):
+        """Lo que se puede rellenar del formulario mirando el servidor (app/suggest.py)."""
+        from .suggest import suggest_module
+        if name not in CATALOG:
+            raise HTTPException(404, "módulo desconocido")
+        return await suggest_module(name, ctx.ssh, ctx.docker)
 
     @app.get("/api/deps/{name}", dependencies=authed)
     async def deps_job(name: str):

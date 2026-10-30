@@ -91,6 +91,9 @@ def test_setup_routes_need_code(tmp_path):
     c, _, _ = make(tmp_path)
     assert c.post("/api/setup", json={"code": "MAL-000"}).status_code == 403
     assert c.post("/api/setup/check/raid", json={"code": "MAL-000", "values": {}}).status_code == 403
+    assert c.post("/api/setup/suggest/raid", json={"code": "MAL-000"}).status_code == 403
+    assert c.post("/api/setup/suggest/nope", json={"code": CODE}).status_code == 404
+    assert c.post("/api/setup/suggest/stocks", json={"code": CODE}).json() == {}
 
 
 def test_installs_with_env_pin_never_see_setup(tmp_path):

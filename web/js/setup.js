@@ -1,6 +1,6 @@
 // Asistente de la primera vez: lo pide todo (nombre, PIN, módulos…) sin tocar archivos.
 import { el, toast } from "./api.js";
-import { field, renderChecks, switchInput } from "./modules.js";
+import { applySuggestions, field, renderChecks, switchInput } from "./modules.js";
 
 const $ = (id) => document.getElementById(id);
 const state = { code: "", info: null, name: "", timezone: "", pin: "", pin2: "", modules: {}, step: 0 };
@@ -120,6 +120,12 @@ function moduleCard(m) {
       sw.node),
     extra);
   sw.input.addEventListener("change", () => { node.classList.toggle("on", sw.input.checked); collect(); });
+  if (fields.length) {
+    // Lo que se pueda averiguar del servidor, ya puesto para cuando lo actives (es una instalación nueva: todo)
+    post(`/api/setup/suggest/${m.name}`, { code: state.code })
+      .then((sugg) => { if (applySuggestions(fields, sugg, false)) collect(); })
+      .catch(() => {});
+  }
   return { node, collect };
 }
 
