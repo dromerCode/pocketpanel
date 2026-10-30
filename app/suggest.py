@@ -87,8 +87,9 @@ def app_root(c: Container) -> str | None:
     """La carpeta donde este contenedor guarda lo suyo, si sigue la costumbre <raíz>/<app>/…: la raíz.
     /srv/appdata/qbittorrent-ssd/config → /srv/appdata, para el contenedor `qbittorrent`."""
     name = c.name.lower()
-    # primero la de la config, que es la que sigue la costumbre (la de las descargas suele ir a otro disco)
-    for _, src in sorted(c.mounts.items(), key=lambda m: "config" not in m[0] and "data" not in m[0]):
+    # Solo /config y /data, la costumbre de las imágenes de apps (linuxserver, hotio…): lo demás suelen ser
+    # descargas, medios o webs, que no son «la carpeta de la app»
+    for _, src in sorted((m for m in c.mounts.items() if m[0] in ("/config", "/data")), key=lambda m: m[0] != "/config"):
         parts = src.split("/")
         for i, part in enumerate(parts[1:], 1):
             p = part.lower()
