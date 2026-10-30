@@ -8,7 +8,7 @@ let openList = false;  // que la lista desplegada no se pliegue al refrescar
 
 function render(p) {
   const badge = $("pkg-badge");
-  badge.textContent = p.running ? "Actualizando…" : p.reboot ? "Reiniciar" : p.count ? `${p.count} pendientes` : "Al día";
+  badge.textContent = p.running ? "Actualizando…" : p.reboot ? "Reiniciar" : p.count ? `${p.count} ${p.count === 1 ? "pendiente" : "pendientes"}` : "Al día";
   badge.className = `badge ${p.running ? "" : p.reboot || p.security ? "warn" : p.count ? "" : "ok"}`;
   $("pkg-sum").replaceChildren(...[
     el("span", {}, p.count ? `${p.count} por actualizar${p.security ? ` · ${p.security} de seguridad` : ""}` : "Todo al día"),

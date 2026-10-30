@@ -2,6 +2,7 @@ import { api, el, fmtBytes, fmtUptime, toast } from "./api.js";
 import { renderCharts } from "./charts.js";
 import { initPush } from "./push.js";
 import { closeProcs, initProcs } from "./procs.js";
+import { diskDot, initDisks, loadHealth, otherDisks } from "./disks.js";
 import { cards } from "./registry.js";
 import { initWidgets, leaveWidgets } from "./widgets.js";
 
@@ -9,11 +10,13 @@ let timer = null;
 let slowTimer = null;
 let range = "1h";
 let lastHistory = [];
+let lastSystem = null;
 const $ = (id) => document.getElementById(id);
 
 export function level(pct) { return pct >= 93 ? "bad" : pct >= 85 ? "warn" : ""; }
 
 function render(d) {
+  lastSystem = d;
   $("st-uptime").textContent = d.uptime != null ? `encendido ${fmtUptime(d.uptime)}` : "";
   $("st-cpu").textContent = d.cpu != null ? `${Math.round(d.cpu)}%` : "…";
   $("st-load").textContent = d.load ? `carga ${d.load.map((x) => x.toFixed(2)).join(" ")}` : "";
@@ -31,10 +34,10 @@ function render(d) {
     const name = k.mount.replace(/\/+$/, "").split("/").pop() || "/";
     return el("li", {},
       el("div", { class: "disk-row" },
-        el("span", { class: "disk-name" }, name),
+        el("span", { class: "disk-name" }, diskDot(k.mount), diskDot(k.mount) ? ` ${name}` : name),
         el("span", { class: "disk-num mono" }, `${fmtBytes(k.avail)} libres · ${k.pct}%`)),
       el("div", { class: `bar ${level(k.pct)}` }, el("i", { style: `width:${k.pct}%` })));
-  }));
+  }), ...otherDisks(d.disks.map((k) => k.mount)));
 }
 
 async function tick() {
@@ -59,6 +62,7 @@ const each = (hook) => { for (const c of cards()) c[hook]?.(); };
 
 function slowTick() {
   loadHistory();
+  loadHealth();
   each("slow");
 }
 
@@ -74,6 +78,7 @@ export function init() {
   initPush();
   initWidgets();
   initProcs();
+  initDisks(() => { if (lastSystem) render(lastSystem); });
   each("init");
 }
 

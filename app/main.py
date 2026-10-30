@@ -28,6 +28,8 @@ from .monitor import Monitor
 from .push import PushService
 from .ssh import SSH, SSHError
 from .assets import IMMUTABLE, Assets, GzipJSON
+from .systemd import Systemd, SystemdError, logs_command
+from .smart import EVERY, DiskHealth, SmartError
 from .processes import ProcessError, Processes
 from .system import SystemSampler
 from .wsutil import until_disconnect
@@ -71,6 +73,8 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
     ctx.deps = deps or Deps(cfg.data_dir)
     ctx.deps.prune([m for m in modules.MODULES if cfg.enabled(m)])
     routers = modules.load(ctx)
+    ctx.health = DiskHealth(ctx.ssh, cfg.data_dir, ctx.tz)
+    ctx.hooks.append(ctx.health)
     ctx.sampler = SystemSampler(ctx.ssh, ctx.docker, cfg.disks)
     ctx.monitor = Monitor(cfg, ctx.ssh, ctx.docker, ctx.history, ctx.push, hooks=ctx.hooks, sampler=ctx.sampler)
     loaded = lambda m: cfg.enabled(m) and m not in ctx.deps_pending  # noqa: E731
@@ -165,6 +169,49 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
         except ProcessError as e:
             raise HTTPException(400, str(e))
         return {"ok": True}
+
+    systemd = Systemd(ctx.ssh)
+    units_now = Shared(systemd.units)  # como los contenedores: una consulta compartida entre pantallas
+
+    @app.get("/api/units", dependencies=authed)
+    async def units():
+        return await units_now.get()
+
+    @app.post("/api/units/{scope}/{unit}/{verb}", dependencies=authed)
+    async def unit_action(scope: str, unit: str, verb: str):
+        try:
+            await systemd.action(scope, unit, verb)
+        except SystemdError as e:
+            raise HTTPException(400, str(e))
+        finally:
+            units_now.invalidate()
+        return {"ok": True}
+
+    @app.get("/api/disks/health", dependencies=authed)
+    async def disk_health(fresh: bool = False):
+        try:
+            h = await ctx.health.health(max_age=0 if fresh else EVERY)
+        except SSHError as e:
+            raise HTTPException(502, str(e))
+        return {**h, "settings": ctx.health.settings}
+
+    @app.put("/api/disks/health/settings", dependencies=authed)
+    async def disk_health_settings(request: Request):
+        try:
+            return ctx.health.set_settings(await json_body(request))
+        except SmartError as e:
+            raise HTTPException(400, str(e))
+
+    @app.post("/api/disks/test", dependencies=authed)
+    async def disk_test(request: Request):
+        b = await json_body(request)
+        try:
+            await ctx.health.start_test(b.get("dev"), b.get("kind"))
+        except SmartError as e:
+            raise HTTPException(400, str(e))
+        except SSHError as e:
+            raise HTTPException(502, str(e))
+        return {"started": True}
 
     async def _services():
         from .services import build_services
@@ -389,6 +436,28 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
     async def save_settings(request: Request):
         b = await json_body(request)
         return _save(general=b.get("values") or {})
+
+    @app.websocket("/ws/unit-logs/{scope}/{unit}")
+    async def ws_unit_logs(ws: WebSocket, scope: str, unit: str):
+        """Los logs de un servicio de systemd (journalctl -f), como los de un contenedor."""
+        if not await auth.ws_authed(ws):
+            return
+        await ws.accept()
+        try:
+            proc = await ctx.ssh.process(logs_command(scope, unit), term_type="dumb", term_size=(500, 50))
+        except (SystemdError, SSHError) as e:
+            await ws.send_text(f"\n[error] {e}\n")
+            return await ws.close()
+
+        async def pump():
+            while data := await proc.stdout.read(8192):
+                await ws.send_text(data.replace("\r\n", "\n"))
+
+        tasks = [asyncio.create_task(pump()), asyncio.create_task(until_disconnect(ws))]
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for t in tasks:
+            t.cancel()
+        proc.close()
 
     @app.websocket("/ws/logs/{name}")
     async def ws_logs(ws: WebSocket, name: str):

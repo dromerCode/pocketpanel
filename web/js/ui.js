@@ -6,7 +6,7 @@ const $ = (id) => document.getElementById(id);
 export function openSheet(title, sub, ...body) {
   $("us-title").textContent = title;
   $("us-sub").textContent = sub || "";
-  $("us-body").replaceChildren(...body);
+  $("us-body").replaceChildren(...body.filter((x) => x != null));
   $("usheet").hidden = false;
 }
 
