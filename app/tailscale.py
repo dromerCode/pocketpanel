@@ -1,4 +1,5 @@
-"""Los dispositivos de la tailnet, de `tailscale status --json` (no necesita root y no cambia nada)."""
+"""El widget Tailscale de Estado: los dispositivos de la tailnet, de `tailscale status --json` (no necesita root y
+no cambia nada). Si el servidor no tiene Tailscale (ni en el sistema ni en un contenedor), el widget no sale."""
 import json
 from datetime import datetime
 
@@ -7,7 +8,7 @@ from datetime import datetime
 TS = r"""ts() {
   if command -v tailscale >/dev/null 2>&1; then tailscale "$@"; return; fi
   c=$(docker ps --format '{{.ID}} {{.Image}}' 2>/dev/null | awk '$2 ~ /tailscale/ {print $1; exit}')
-  [ -n "$c" ] || { echo "Tailscale no está instalado ni hay un contenedor de Tailscale en marcha"; return 1; }
+  [ -n "$c" ] || { echo @absent; return 0; }  # ni instalado ni en un contenedor: el widget no sale
   docker exec "$c" tailscale "$@" 2>/dev/null
 }
 """
@@ -33,6 +34,8 @@ def _device(p: dict, me: bool = False) -> dict:
 
 
 def parse_status(out: str) -> dict:
+    if out.strip().endswith("@absent"):  # aunque antes se haya colado algún aviso por stderr
+        return {"state": "absent", "devices": []}
     try:
         j = json.loads(out)
     except ValueError:

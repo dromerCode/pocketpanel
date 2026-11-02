@@ -1,5 +1,6 @@
-// Tailscale: los dispositivos de la tailnet con una lucecita (conectado o no), en Estado.
-import { api, el, fmtAgo } from "/js/api.js";
+// El widget Tailscale de Estado: los dispositivos de la tailnet con una lucecita (conectado o no). Oculto no pide
+// nada; si el servidor no tiene Tailscale, el widget se quita.
+import { api, el, fmtAgo } from "./api.js";
 
 const $ = (id) => document.getElementById(id);
 const OS = { linux: "Linux", windows: "Windows", macOS: "Mac", iOS: "iPhone", android: "Android", freebsd: "FreeBSD" };
@@ -14,9 +15,16 @@ function row(d) {
     el("span", { class: "ts-sub" }, sub));
 }
 
+const widget = () => document.querySelector('#st-grid > [data-w="tailscale"]');
+
 export async function loadTailscale() {
+  if (!widget() || widget().hidden) return;
   try {
     const t = await api("/api/tailscale");
+    if (t.state === "absent") {
+      widget().remove();
+      return;
+    }
     const badge = $("ts-badge");
     if (t.state !== "Running") {
       badge.textContent = t.state === "error" ? "Sin datos" : t.state === "Stopped" ? "Apagado" : t.state;
@@ -32,4 +40,8 @@ export async function loadTailscale() {
     $("ts-badge").textContent = "Sin datos";
     $("ts-list").replaceChildren(el("li", { class: "muted small" }, e.message));
   }
+}
+
+export function initTailscale() {
+  widget()?.addEventListener("wshow", loadTailscale);
 }

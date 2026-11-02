@@ -4,6 +4,7 @@ import { initPush } from "./push.js";
 import { closeProcs, initProcs } from "./procs.js";
 import { diskDot, initDisks, loadHealth, otherDisks } from "./disks.js";
 import { cards } from "./registry.js";
+import { initTailscale, loadTailscale } from "./tailscale.js";
 import { initWidgets, leaveWidgets } from "./widgets.js";
 
 let timer = null;
@@ -63,6 +64,7 @@ const each = (hook) => { for (const c of cards()) c[hook]?.(); };
 function slowTick() {
   loadHistory();
   loadHealth();
+  loadTailscale();
   each("slow");
 }
 
@@ -79,6 +81,7 @@ export function init() {
   initWidgets();
   initProcs();
   initDisks(() => { if (lastSystem) render(lastSystem); });
+  initTailscale();
   each("init");
 }
 

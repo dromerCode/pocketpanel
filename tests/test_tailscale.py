@@ -1,6 +1,6 @@
 import json
 
-from app.modules.tailscale.tailscale import parse_status
+from app.tailscale import parse_status
 
 
 def test_parse_status():
@@ -24,8 +24,9 @@ def test_not_running():
 
 def test_falls_back_to_container():
     # si tailscale va en un contenedor: sin el binario se usa docker exec
-    from app.modules.tailscale import checks
-    from app.modules.tailscale.tailscale import SCRIPT
-    assert "command -v tailscale" in SCRIPT and "docker exec" in SCRIPT
-    s, labels = checks.script({})
-    assert "docker exec" in s and list(labels) == ["up"]
+    from app.tailscale import SCRIPT
+    assert "command -v tailscale" in SCRIPT and "docker exec" in SCRIPT and "@absent" in SCRIPT
+
+
+def test_absent():
+    assert parse_status("@absent\n") == {"state": "absent", "devices": []}
