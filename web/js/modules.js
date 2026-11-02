@@ -76,16 +76,20 @@ export function switchInput(checked) {
 }
 
 export function field(f, value) {
-  let input, get;
+  let input, get, set;
+  const hint = el("span", { class: "suggest", hidden: true });
+  const api_ = (node) => ({ node, get, set, hint, secret: f.type === "secret", saved: f.type === "secret" && !!value?.set });
   if (f.type === "bool") {
     const s = switchInput(value);
-    return { node: el("label", { class: "inline" }, el("span", {}, f.label, f.help ? el("div", { class: "help" }, f.help) : null), s.node),
-      get: () => s.input.checked };
+    get = () => s.input.checked;
+    set = (v) => { s.input.checked = !!v; };
+    return api_(el("label", { class: "inline" }, el("span", {}, f.label, f.help ? el("div", { class: "help" }, f.help) : null, hint), s.node));
   }
   if (f.type === "list") {
     input = el("textarea", { rows: 3, placeholder: "uno por línea" });
     input.value = (value || []).join("\n");
     get = () => input.value.split("\n").map((x) => x.trim()).filter(Boolean);
+    set = (v) => { input.value = v.join("\n"); input.rows = Math.min(10, Math.max(3, v.length)); };
   } else if (f.type === "choice") {
     input = el("select", {}, f.choices.map((c) => el("option", { value: c }, c || "(lo que diga tu configuración)")));
     input.value = value ?? "";
@@ -107,14 +111,58 @@ export function field(f, value) {
     input.value = value ?? "";
     get = () => input.value.trim();
   }
-  return { node: el("label", {}, f.label, input, f.help ? el("span", { class: "help" }, f.help) : null), get };
+  set ??= (v) => { input.value = v ?? ""; };
+  return api_(el("label", {}, f.label, input, f.help ? el("span", { class: "help" }, f.help) : null, hint));
+}
+
+/* ---------- Sugerencias: lo que se averigua mirando el servidor (app/suggest.py) ---------- */
+
+const fmtValue = (v) => (Array.isArray(v) ? v.join(", ") : v === true ? "sí" : String(v));
+const isEmpty = (v) => v == null || v === "" || v === false || (Array.isArray(v) && !v.length);
+
+/** Rellena `fields` ([[clave, campo]]) con `sugg`. En un módulo apagado (o recién instalado) rellena todo; en uno
+ * que ya funciona solo lo vacío, y en lo demás ofrece el valor encontrado con un botón. Devuelve cuántos ha rellenado. */
+export function applySuggestions(fields, sugg, configured) {
+  let n = 0;
+  for (const [k, f] of fields) {
+    const s = sugg[k];
+    if (!s) continue;
+    if (!f.secret && JSON.stringify(f.get()) === JSON.stringify(s.value)) continue;  // ya está bien
+    if (!configured || (isEmpty(f.get()) && !f.saved)) {
+      f.set(s.value);
+      f.hint.replaceChildren(`✨ Encontrado: ${s.why}`);
+      f.hint.hidden = false;
+      n++;
+    } else if (Array.isArray(s.value)) {
+      // Una lista que ya tiene lo suyo: solo se ofrece añadir lo que falte, nunca quitar
+      const cur = f.get();
+      const missing = s.value.filter((x) => !cur.includes(x));
+      if (!missing.length) continue;
+      const add = el("button", { type: "button", class: "suggest-use", onclick: (e) => {
+        e.preventDefault();
+        f.set([...f.get(), ...missing.filter((x) => !f.get().includes(x))]);
+        f.hint.replaceChildren(`✨ Añadido: ${s.why}`);
+      } }, "Añadir");
+      f.hint.replaceChildren(`✨ También hay ${fmtValue(missing)} (${s.why}) `, add);
+      f.hint.hidden = false;
+    } else {
+      const use = el("button", { type: "button", class: "suggest-use", onclick: (e) => {
+        e.preventDefault();
+        f.set(s.value);
+        f.hint.replaceChildren(`✨ Encontrado: ${s.why}`);
+      } }, "Usar");
+      f.hint.replaceChildren(f.secret ? `✨ Hay una en el servidor (${s.why}) ` : `✨ En el servidor: ${fmtValue(s.value)} (${s.why}) `, use);
+      f.hint.hidden = false;
+    }
+  }
+  return n;
 }
 
 function sheet(icon, title, sub, ...body) {
   $("ms-icon").textContent = icon;
   $("ms-title").textContent = title;
   $("ms-sub").textContent = sub || "";
-  $("ms-body").replaceChildren(...body);
+  $("ms-body").replaceChildren(...body.filter((x) => x != null));
   $("msheet").hidden = false;
 }
 const closeSheet = () => { $("msheet").hidden = true; };
@@ -172,8 +220,20 @@ function openModule(m) {
     }
   }
 
+  const found = el("p", { class: "suggest-status muted small", hidden: !fields.length }, "Buscando en el servidor qué rellenar…");
+  if (fields.length) {
+    api(`/api/modules/${m.name}/suggest`).then((sugg) => {
+      const n = applySuggestions(fields, sugg, m.enabled);
+      const offered = Object.keys(sugg).length;
+      found.hidden = !offered;
+      found.textContent = n ? `✨ He rellenado ${n === 1 ? "un campo" : `${n} campos`} con lo que hay en el servidor: revísalo antes de guardar.`
+        : "✨ Lo he comparado con lo que hay en el servidor.";
+    }).catch(() => { found.hidden = true; });
+  }
+
   sheet(m.icon, m.title, m.desc,
     el("div", { class: "switch-row" }, el("b", {}, "Activado"), enabled.node),
+    found,
     fields.length ? el("div", { class: "form" }, fields.map(([, f]) => f.node)) : null,
     depsSection(m),
     el("div", {}, el("h2", { class: "section-title" }, "Requisitos"), checks,

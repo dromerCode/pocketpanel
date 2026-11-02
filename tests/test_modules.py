@@ -19,6 +19,7 @@ modules:
   stocks: {enabled: true}
   files: {enabled: true}
   packages: {enabled: true}
+  tailscale: {enabled: true}
 """
 NONE = """
 name: casa-ramon

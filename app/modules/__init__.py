@@ -70,6 +70,16 @@ def checks(name: str):
         return None
 
 
+def suggester(name: str):
+    """El suggest.py del módulo (rellena su formulario con lo que encuentra, ver app/suggest.py), o None."""
+    try:
+        return importlib.import_module(f"{__name__}.{name}.suggest")
+    except ModuleNotFoundError as e:
+        if e.name != f"{__name__}.{name}.suggest":
+            raise
+        return None
+
+
 def web_dir(name: str) -> Path | None:
     """La carpeta web/ del módulo (se sirve en /modules/<nombre>/), si tiene interfaz."""
     d = Path(__file__).parent / name / "web"

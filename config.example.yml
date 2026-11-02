@@ -58,6 +58,9 @@ modules:
     enabled: false
     roots: ["~"]               # lo único que se puede ver y tocar; p. ej. ["~", "/mnt"]
 
+  tailscale:                   # tus dispositivos de la tailnet y si están conectados (solo lee `tailscale status`)
+    enabled: false
+
   sites:                       # webs que deben responder + días que le quedan al certificado, con avisos
     enabled: false
     urls: []                   # ["https://midominio.com", "http://127.0.0.1:8096"]

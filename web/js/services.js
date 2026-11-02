@@ -1,7 +1,8 @@
-import { api, el, fmtBytes, serviceIcon, toast, wsUrl } from "./api.js";
+import { api, el, fmtAgo, fmtBytes, serviceIcon, toast, wsUrl } from "./api.js";
 import { closeSheet as closeUSheet, initSheet } from "./ui.js";
 
 let items = [];
+let units = [];       // servicios de systemd (app/systemd.py): van debajo, tras una línea
 let filter = "all";
 let timer = null;
 let open = null;      // servicio de la ficha abierta
@@ -32,6 +33,7 @@ export const addInfo = (node) => document.querySelector("#view-services .search-
  * `first`: junto a «Abrir» en vez de al final. */
 export function addSheetButton(node, fill, first = false) {
   sheetButtons.push({ node, fill });
+  node.classList.add("mod-sheet-btn");
   if (first) $("sh-open").after(node);
   else document.querySelector("#sheet .sheet-actions").append(node);
 }
@@ -39,6 +41,9 @@ export function addSheetButton(node, fill, first = false) {
 export const onShow = (fn) => showHooks.push(fn);
 /** El servicio de la ficha abierta (o undefined). */
 export const current = () => items.find((x) => x.name === open);
+const find = (name) => items.find((x) => x.name === name) || units.find((x) => x.name === name);
+// Parar uno de estos deja al panel sin Docker o sin SSH hasta que se vuelva a arrancar a mano
+const VITAL = new Set(["docker.service", "containerd.service", "ssh.service", "sshd.service"]);
 export { closeSheet, load as reload };
 
 const ANSI = /\x1b\[[0-9;?]*[ -\/]*[@-~]|\x1b\][^\x07]*\x07/g;
@@ -65,11 +70,31 @@ function serviceUrl(s) {
   return null;
 }
 
+function unitStatus(u) {
+  const ago = u.since ? ` · ${fmtAgo(u.since).replace(/^hace /, u.up ? "desde hace " : "hace ")}` : "";
+  if (u.failed) return `falló${u.result && u.result !== "success" ? ` (${u.result})` : ""}${ago}`;
+  if (u.up) return `${u.sub === "exited" ? "hecho" : "activo"}${ago}`;
+  return `parado${u.enabled === "enabled" ? "" : " · no arranca solo"}${ago}`;
+}
+
+function unitRow(u) {
+  return el("li", {}, el("button", { class: "svc", onclick: () => openSheet(u.name) },
+    el("span", { class: "svc-icon svc-unit-icon" }, "⚙"),
+    el("div", { class: "svc-main" },
+      el("div", { class: "svc-name" }, el("i", { class: `dot ${u.up ? "" : "off"}` }), el("span", {}, u.title),
+        u.scope === "user" ? el("b", { class: "svc-tag" }, "usuario") : null),
+      el("div", { class: "svc-sub" }, unitStatus(u))),
+    el("div", { class: "svc-stats mono" }, u.mem != null ? fmtBytes(u.mem) : "")));
+}
+
 function renderList() {
   const q = $("svc-search").value.trim().toLowerCase();
   const match = filter === "down" ? (s) => !s.up : filters[filter]?.match || (() => true);
-  const shown = items.filter((s) => match(s) && (!q || s.name.toLowerCase().includes(q) || s.title.toLowerCase().includes(q)));
-  if (!shown.length) {
+  const hit = (s) => !q || s.name.toLowerCase().includes(q) || s.title.toLowerCase().includes(q) || (s.desc || "").toLowerCase().includes(q);
+  const shown = items.filter((s) => match(s) && hit(s));
+  // los de systemd solo en Todos y Caídos (los filtros de los módulos son cosa de contenedores)
+  const shownUnits = filter === "all" || filter === "down" ? units.filter((u) => (filter === "all" || u.failed) && hit(u)) : [];
+  if (!shown.length && !shownUnits.length) {
     const msg = (filter === "down" ? "Nada caído 👌" : filters[filter]?.empty?.()) || "Sin resultados";
     $("svc-list").replaceChildren(el("li", { class: "empty" }, msg));
     return;
@@ -87,12 +112,12 @@ function renderList() {
           s.updating ? el("b", { class: "upd-badge" }, "actualizando…") : s.update ? el("b", { class: "upd-badge" }, "⬆ nueva") : null),
         el("div", { class: "svc-sub" }, statusEs(s.status))),
       el("div", { class: "svc-stats mono" }, stats)));
-  }));
+  }), ...(shownUnits.length ? [el("li", { class: "svc-sep", role: "separator" }, "Servicios del sistema"), ...shownUnits.map(unitRow)] : []));
 }
 
 async function load() {
   try {
-    items = await api("/api/containers");
+    [items, units] = await Promise.all([api("/api/containers"), api("/api/units").catch(() => units)]);
     renderList();
     if (open) fillSheet();
   } catch (e) {
@@ -107,8 +132,10 @@ function setFilter(f) {
 }
 
 function fillSheet() {
-  const s = items.find((x) => x.name === open);
+  const s = find(open);
   if (!s) return;
+  $("sheet").classList.toggle("is-unit", s.kind === "unit");
+  if (s.kind === "unit") return fillUnitSheet(s);
   serviceIcon($("sh-icon"), s);
   $("sh-title").textContent = s.title;
   $("sh-status").textContent = `● ${statusEs(s.status)}`;
@@ -119,6 +146,17 @@ function fillSheet() {
   for (const b of sheetButtons) b.fill?.(s);
   $("sh-toggle").textContent = s.up ? "Parar" : "Arrancar";
   $("sh-toggle").classList.toggle("btn-danger", s.up);
+}
+
+function fillUnitSheet(u) {
+  const icon = $("sh-icon");
+  icon.replaceChildren("⚙");
+  $("sh-title").textContent = u.title;
+  $("sh-status").textContent = `● ${unitStatus(u)}${u.scope === "user" ? " · de usuario" : ""}`;
+  $("sh-status").style.color = u.up ? "var(--accent)" : "var(--danger)";
+  $("sh-open").hidden = true;
+  $("sh-toggle").textContent = u.up ? "Parar" : "Arrancar";
+  $("sh-toggle").classList.toggle("btn-danger", u.up);
 }
 
 function flushLogs() {
@@ -139,7 +177,8 @@ function openSheet(name) {
   $("sh-logs").textContent = "";
   fillSheet();
   $("sheet").hidden = false;
-  logWs = new WebSocket(wsUrl(`/ws/logs/${encodeURIComponent(name)}`));
+  const u = units.find((x) => x.name === name);
+  logWs = new WebSocket(wsUrl(u ? `/ws/unit-logs/${u.scope}/${encodeURIComponent(u.unit)}` : `/ws/logs/${encodeURIComponent(name)}`));
   logWs.onmessage = (e) => { pending += e.data.replace(ANSI, ""); requestAnimationFrame(flushLogs); };
   logWs.onclose = (e) => { if (e.code === 4401) location.reload(); };
 }
@@ -152,15 +191,18 @@ function closeSheet() {
 }
 
 async function action(verb) {
-  const s = items.find((x) => x.name === open);
+  const s = find(open);
   if (!s) return;
-  if (verb === "stop" && !confirm(`¿Parar ${s.title}?`)) return;
+  const vital = s.kind === "unit" && VITAL.has(s.unit) && verb !== "start";
+  if (vital && !confirm(`${s.title} es lo que usa el panel para llegar al servidor: si ${verb === "stop" ? "lo paras, el panel se queda sin él hasta que lo arranques a mano" : "no vuelve a arrancar, el panel se queda sin él"}.\n\n¿Seguro?`)) return;
+  if (!vital && verb === "stop" && !confirm(`¿Parar ${s.title}?`)) return;
   const btns = document.querySelectorAll(".sheet-actions .btn");
   btns.forEach((b) => (b.disabled = true));
   const label = { start: "Arrancando", stop: "Parando", restart: "Reiniciando" }[verb];
   toast(`${label} ${s.title}…`);
   try {
-    await api(`/api/containers/${encodeURIComponent(s.name)}/${verb}`, { method: "POST" });
+    await api(s.kind === "unit" ? `/api/units/${s.scope}/${encodeURIComponent(s.unit)}/${verb}`
+      : `/api/containers/${encodeURIComponent(s.name)}/${verb}`, { method: "POST" });
     toast(`${s.title}: hecho`);
     if (verb !== "stop") {  // los logs del contenedor nuevo
       const name = s.name;
@@ -183,8 +225,7 @@ export function init() {
   $("sheet").addEventListener("click", (e) => { if (e.target.id === "sheet") closeSheet(); });
   $("sh-restart").onclick = () => action("restart");
   $("sh-toggle").onclick = () => {
-    const s = items.find((x) => x.name === open);
-    action(s?.up ? "stop" : "start");
+    action(find(open)?.up ? "stop" : "start");
   };
   $("sh-pause").onclick = () => {
     paused = !paused;

@@ -9,6 +9,7 @@ app/modules/weather/
 ├── __init__.py      manifest: what the module store shows and its options (always imported: keep it light)
 ├── api.py           setup(ctx) -> APIRouter (imported only when the module is on)
 ├── checks.py        optional: requirement checks for the "Comprobar requisitos" button
+├── suggest.py       optional: fills its form with what it finds on the server
 ├── requirements.txt optional: Python packages only this module needs (see below)
 ├── weather.py       your own logic, as many files as you like
 └── web/             optional: its part of the interface, served at /modules/weather/
@@ -96,6 +97,25 @@ async def http_checks(values, http):   # checks made from the panel itself
     r = await http.get("https://api.example.com/ping")
     return [{"label": "The API answers", "ok": r.status_code == 200, "level": "error", "detail": ""}]
 ```
+
+## Filling the form for the user (`suggest.py`)
+
+When the module's form opens (in the module store or in the first-run setup), the panel calls `suggest(env)`
+and fills the form with the result, showing under each field where the value came from. In a module that is
+off, it fills everything. In one already set up, it fills only empty fields; for anything else it offers the
+value behind a "Usar" button, and for lists it only offers to add what is missing.
+
+```python
+async def suggest(env):
+    c = await env.find("weatherd")              # a container by name or image (prefers a running one)
+    if c and (url := c.url(8000)):              # how the panel reaches that container port (published or host network)
+        return {"api_url": {"value": url, "why": c.where(8000)}}
+    return {}
+```
+
+`env` (`app/suggest.py`) also has `containers()` (with `.ports`, `.mounts`, `.labels`), `sh(script)` to run
+something on the host, and `read(path)`. Return only what you found. It must only look, never change anything.
+It has 20 s, and if it fails, the form just opens as usual.
 
 ## Interface (`web/index.js`)
 
