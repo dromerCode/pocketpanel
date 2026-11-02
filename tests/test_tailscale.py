@@ -20,3 +20,12 @@ def test_parse_status():
 def test_not_running():
     assert parse_status("failed to connect to local tailscaled")["state"] == "error"
     assert parse_status(json.dumps({"BackendState": "Stopped"}))["state"] == "Stopped"
+
+
+def test_falls_back_to_container():
+    # si tailscale va en un contenedor: sin el binario se usa docker exec
+    from app.modules.tailscale import checks
+    from app.modules.tailscale.tailscale import SCRIPT
+    assert "command -v tailscale" in SCRIPT and "docker exec" in SCRIPT
+    s, labels = checks.script({})
+    assert "docker exec" in s and list(labels) == ["up"]

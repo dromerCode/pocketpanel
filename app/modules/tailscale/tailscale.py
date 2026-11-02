@@ -2,7 +2,16 @@
 import json
 from datetime import datetime
 
-SCRIPT = "tailscale status --json 2>&1"
+# `tailscale` del sistema, o el de un contenedor de Tailscale si va en Docker (algunos sistemas para NAS lo traen así). El stderr de docker
+# fuera: avisos como "Error loading config file" romperían el JSON
+TS = r"""ts() {
+  if command -v tailscale >/dev/null 2>&1; then tailscale "$@"; return; fi
+  c=$(docker ps --format '{{.ID}} {{.Image}}' 2>/dev/null | awk '$2 ~ /tailscale/ {print $1; exit}')
+  [ -n "$c" ] || { echo "Tailscale no está instalado ni hay un contenedor de Tailscale en marcha"; return 1; }
+  docker exec "$c" tailscale "$@" 2>/dev/null
+}
+"""
+SCRIPT = TS + "ts status --json 2>&1"
 NEVER = "0001-01-01"
 
 

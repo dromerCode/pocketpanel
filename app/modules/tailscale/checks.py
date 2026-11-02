@@ -1,6 +1,8 @@
 from ...requirements import PRELUDE, chk
+from .tailscale import TS
 
 
 def script(v: dict) -> tuple[str, dict]:
-    return (PRELUDE + chk("bin", "error", "command -v tailscale") + chk("up", "error", "tailscale status --json >/dev/null"),
-            {"bin": "Tailscale instalado", "up": "Tailscale funcionando y conectado"})
+    # chk lo ejecuta en otro sh: la función ts tiene que ir dentro del comando
+    return (PRELUDE + chk("up", "error", TS + "ts status --json >/dev/null"),
+            {"up": "Tailscale funcionando y conectado (en el sistema o en un contenedor)"})
