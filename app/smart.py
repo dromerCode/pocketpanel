@@ -26,14 +26,15 @@ log = logging.getLogger("pocketpanel.smart")
 
 FILE = "disk_health.json"
 EVERY = 600  # s entre lecturas
-DEFAULTS = {"notify": True, "temp_limit": 55, "short": "weekly", "long": "monthly", "at": "03:00"}
+DEFAULTS = {"notify": True, "temp_limit": 55, "short": "weekly", "long": "off", "at": "03:00"}
 SCHEDULES = {"short": ("off", "daily", "weekly"), "long": ("off", "weekly", "monthly")}
 TESTS = ("short", "long")
 DEV_RE = re.compile(r"^/dev/(sd[a-z]+|hd[a-z]+|vd[a-z]+|nvme\d+n\d+)$")
 
 SCRIPT = r"""
 echo @map; lsblk -rnpbo NAME,TYPE,SIZE,PKNAME,MOUNTPOINT 2>/dev/null
-sudo -n true 2>/dev/null && S="sudo -n " || S=""
+# Basta con poder usar smartctl con sudo (sudoers: NOPASSWD: /usr/sbin/smartctl), no hace falta sudo para todo
+sudo -n smartctl --version >/dev/null 2>&1 && S="sudo -n " || S=""
 echo "@sudo ${S:+yes}"
 for d in $(lsblk -dnpbo NAME,TYPE,SIZE 2>/dev/null | awk '$2=="disk" && $3>0 {print $1}'); do
   echo "@disk $d"; ${S}smartctl -n standby -j -H -A -i -c -l selftest "$d" 2>/dev/null | tr -d '\n'; echo

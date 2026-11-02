@@ -91,3 +91,14 @@ def test_settings_and_tests(tmp_path):
     for dev, kind in (("/dev/sda; rm -rf /", "short"), ("/dev/sda", "conveyance"), ("/etc/passwd", "long")):
         with pytest.raises(SmartError):
             asyncio.run(h.start_test(dev, kind))
+
+
+def test_sudo_only_needs_smartctl():
+    # una regla de sudoers solo para smartctl tiene que bastar: no se comprueba con `sudo -n true`
+    from app.smart import SCRIPT
+    assert "sudo -n smartctl --version" in SCRIPT and "sudo -n true" not in SCRIPT
+
+
+def test_long_test_off_by_default():
+    from app.smart import DEFAULTS
+    assert DEFAULTS["long"] == "off"
