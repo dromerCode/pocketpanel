@@ -46,6 +46,7 @@ def test_run_script_uses_only_the_allowed_commands():
     s = run_script(True)
     assert "sudo -n apt update" in s and "sudo -n apt upgrade -y;" in s and "setsid nohup" in s
     assert "upgrade" not in run_script(False)
+    assert 'echo upgrade >' in s and 'echo check >' in run_script(False)
 
 
 class FakeSSH:
@@ -64,10 +65,12 @@ def test_packages_cache_and_start():
     async def go():
         a = await pk.listing()
         await pk.listing()
-        assert sum("apt list" in c for c in ssh.cmds) == 1 and a["running"] is False
+        assert sum("apt list" in c for c in ssh.cmds) == 1 and a["running"] is False and a["doing"] is None
         await pk.start(True)
         await pk.listing()  # al arrancar se olvida la lista
         assert sum("apt list" in c for c in ssh.cmds) == 2
+        ssh.answers.insert(0, ("kill -0", "check\n"))
+        assert (await pk.listing())["doing"] == "check"
         ssh.answers.insert(0, ("setsid", "busy\n"))
         with pytest.raises(PackagesError):
             await pk.start(False)

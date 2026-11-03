@@ -11,7 +11,7 @@ import re
 import time
 
 DIR = "$HOME/.cache/pocketpanel"
-LOG, PID = f"{DIR}/apt.log", f"{DIR}/apt.pid"
+LOG, PID, KIND = f"{DIR}/apt.log", f"{DIR}/apt.pid", f"{DIR}/apt.kind"  # kind: «check» o «upgrade»
 FRESH = 300  # s: la lista se relee como mucho cada 5 min (o al acabar una actualización)
 LIST_SCRIPT = r"""
 echo @list; LC_ALL=C apt list --upgradable 2>/dev/null
@@ -53,6 +53,7 @@ def run_script(upgrade: bool) -> str:
         steps += ' && { echo; echo "$ sudo apt upgrade -y"; sudo -n apt upgrade -y; }'
     inner = f'{steps}; echo "@rc $?"'
     return (f'mkdir -p "{DIR}"; if {RUNNING}; then echo busy; exit 0; fi\n'
+            f'echo {"upgrade" if upgrade else "check"} >"{KIND}"\n'
             f"setsid nohup sh -c '{inner}' </dev/null >\"{LOG}\" 2>&1 & echo $! >\"{PID}\"; echo started\n")
 
 
@@ -93,10 +94,13 @@ class Packages:
     async def listing(self, fresh: bool = False) -> dict:
         if fresh or not self._list or time.monotonic() - self._at > FRESH:
             self._list, self._at = parse_list(await self.ssh.run(LIST_SCRIPT, timeout=30)), time.monotonic()
-        return {**self._list, "running": await self.running()}
+        doing = await self.running()
+        return {**self._list, "running": bool(doing), "doing": doing}
 
-    async def running(self) -> bool:
-        return (await self.ssh.run(f"{RUNNING} && echo yes; true")).strip() == "yes"
+    async def running(self) -> str | None:
+        """Lo que está en marcha: «check» (buscar), «upgrade» (actualizar) o None."""
+        out = (await self.ssh.run(f'if {RUNNING}; then cat "{KIND}" 2>/dev/null || echo upgrade; fi; true')).strip()
+        return ("check" if out == "check" else "upgrade") if out else None
 
     async def start(self, upgrade: bool) -> None:
         out = await self.ssh.run(run_script(upgrade))
