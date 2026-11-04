@@ -46,6 +46,7 @@ Optional modules, turned on and configured from the app itself (**Status → ⚙
 | `downloads` | qBittorrent (pause/resume, speeds, ETA), Sonarr/Radarr queue and what airs in the next 7 days; push when a download finishes or *arr reports a problem | qBittorrent / Sonarr / Radarr |
 | `jellyfin` | Manage Jellyfin accounts and invites through [jfa-go](https://github.com/hrfee/jfa-go) | jfa-go |
 | `stocks` | Stock portfolio: prices, rule-based buy/hold/sell verdicts (RSI, MACD, Bollinger, ATR stops, entry zones), watchlist, a "discover" scan of ~50 large caps and Telegram/push alerts when a verdict changes. It only records what you do at your broker | downloads `curl_cffi` (~38 MB) when enabled |
+| `cobros` | What your clients owe you (for freelancers): programs with yearly plans, subscribers per plan (green = paid until the next date, red = overdue), loose debts, staged payments for projects and recent payments. When a client charge is fully paid its invoice is made by filling your own `.xlsx` template, and saved in `data/cobros/facturas/<year>/`. Push at 9:00 for new and overdue charges | – |
 
 On a wide screen it switches to a sidebar layout:
 
