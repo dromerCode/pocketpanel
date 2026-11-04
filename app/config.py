@@ -28,6 +28,8 @@ TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 # Valores por defecto de cada módulo, sacados de su manifiesto (app/modules/<nombre>/__init__.py)
 MODULE_DEFAULTS: dict[str, dict] = {name: m.defaults() for name, m in REGISTRY.items()}
+# Módulos que ya no lo son: un config.yml que aún los tenga tiene que seguir arrancando
+RETIRED_MODULES = {"tailscale"}
 
 TOP_DEFAULTS = {"name": "servidor", "timezone": "Europe/Madrid", "disks": [], "disk_alert_percent": 90,
                 "host_env": {}, "push_contact": "mailto:admin@example.com", "services": {}}
@@ -109,7 +111,7 @@ def _modules(raw) -> dict:
                 raise ConfigError(f"modules.{name}.{f['key']}: obligatorio")
         out[name] = m
     for name in raw:
-        if name not in MODULE_DEFAULTS:
+        if name not in MODULE_DEFAULTS and name not in RETIRED_MODULES:
             raise ConfigError(f"modules.{name}: módulo desconocido")
     return out
 

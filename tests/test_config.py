@@ -35,6 +35,12 @@ def test_unknown_module(tmp_path):
         cfg(tmp_path, "modules:\n  foo: {enabled: true}\n")
 
 
+def test_retired_module_is_ignored(tmp_path):
+    # tailscale fue un módulo hasta que pasó a ser un widget fijo: un config.yml viejo tiene que seguir arrancando
+    c = cfg(tmp_path, "modules:\n  tailscale: {enabled: true}\n")
+    assert "tailscale" not in c.modules
+
+
 def test_enabled_must_be_bool(tmp_path):
     with pytest.raises(ConfigError, match="modules.raid.enabled"):
         cfg(tmp_path, "modules:\n  raid: {enabled: 'yes'}\n")

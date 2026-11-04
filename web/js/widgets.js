@@ -12,6 +12,9 @@ const grid = () => $("st-grid");
 const widgets = () => [...grid().children].filter((w) => w.classList.contains("w"));
 let defaults = null;  // id → { size, rank }, como vienen de index.html / registry.js
 let saveTimer = null;
+let layoutLoaded;
+/** Se cumple cuando ya está aplicada la organización guardada (o no se ha podido leer): antes, ningún widget sabe si está oculto. */
+export const layoutReady = new Promise((resolve) => { layoutLoaded = resolve; });
 
 function setSize(w, size) {
   w.dataset.cur = size;
@@ -152,6 +155,8 @@ export async function initWidgets() {
     apply((await api("/api/layout")).widgets);
   } catch (e) {
     if (e.message !== "no autenticado") toast(`Organización: ${e.message}`, true);
+  } finally {
+    layoutLoaded();
   }
 }
 
