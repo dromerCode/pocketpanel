@@ -29,6 +29,13 @@ def test_enable_module_keeps_comments_and_other_keys(tmp_path):
     assert c.name == "casa" and c.enabled("raid") and c.mod("raid")["device"] == "/dev/md1"
 
 
+def test_saving_works_with_a_retired_module_in_the_file(tmp_path):
+    p = tmp_path / "config.yml"
+    p.write_text(YML + "  tailscale:\n    enabled: true\n")
+    apply_changes(str(p), env(tmp_path), module="raid", enabled=True, values={"device": "/dev/md1"})
+    assert load_config(str(p), env(tmp_path)).enabled("raid")
+
+
 def test_invalid_change_leaves_file_untouched(tmp_path):
     p = tmp_path / "config.yml"
     p.write_text(YML)

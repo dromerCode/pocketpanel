@@ -30,6 +30,7 @@ from .ssh import SSH, SSHError
 from .assets import IMMUTABLE, Assets, GzipJSON
 from .systemd import Systemd, SystemdError, logs_command
 from .smart import EVERY, DiskHealth, SmartError
+from .tailscale import SCRIPT as TS_SCRIPT, parse_status as ts_status
 from .processes import ProcessError, Processes
 from .system import SystemSampler
 from .wsutil import until_disconnect
@@ -186,6 +187,14 @@ def create_app(cfg: Config, restart=None, deps=None) -> FastAPI:
         finally:
             units_now.invalidate()
         return {"ok": True}
+
+    async def _tailscale():
+        return ts_status(await ctx.ssh.run(TS_SCRIPT, timeout=15))
+    tailscale_now = Shared(_tailscale, ttl=15)
+
+    @app.get("/api/tailscale", dependencies=authed)
+    async def tailscale():
+        return await tailscale_now.get()
 
     @app.get("/api/disks/health", dependencies=authed)
     async def disk_health(fresh: bool = False):

@@ -12,6 +12,9 @@ const grid = () => $("st-grid");
 const widgets = () => [...grid().children].filter((w) => w.classList.contains("w"));
 let defaults = null;  // id → { size, rank }, como vienen de index.html / registry.js
 let saveTimer = null;
+let layoutLoaded;
+/** Se cumple cuando ya está aplicada la organización guardada (o no se ha podido leer): antes, ningún widget sabe si está oculto. */
+export const layoutReady = new Promise((resolve) => { layoutLoaded = resolve; });
 
 function setSize(w, size) {
   w.dataset.cur = size;
@@ -25,7 +28,9 @@ function apply(items) {
   for (const w of all) {
     const it = byId.get(w.dataset.w);
     setSize(w, it?.size ?? defaults[w.dataset.w].size);
+    const was = w.hidden;
     w.hidden = !!it?.hidden;
+    if (was && !w.hidden) w.dispatchEvent(new Event("wshow"));  // que se ponga al día (p. ej. al restablecer)
   }
   // Los guardados en su orden; cada uno de los nuevos, justo antes del primer guardado que iba detrás de él
   const known = all.filter((w) => byId.has(w.dataset.w)).sort((a, b) => byId.get(a.dataset.w).i - byId.get(b.dataset.w).i);
@@ -58,7 +63,7 @@ function renderTray() {
   const tray = $("st-hidden");
   tray.hidden = !grid().classList.contains("editing") || !off.length;
   tray.replaceChildren(el("span", { class: "muted small" }, "Ocultos:"), ...off.map((w) =>
-    el("button", { class: "btn btn-sm", type: "button", onclick: () => { w.hidden = false; renderTray(); save(); } },
+    el("button", { class: "btn btn-sm", type: "button", onclick: () => { w.hidden = false; renderTray(); save(); w.dispatchEvent(new Event("wshow")); } },
       `+ ${w.dataset.title}`)));
 }
 
@@ -150,6 +155,8 @@ export async function initWidgets() {
     apply((await api("/api/layout")).widgets);
   } catch (e) {
     if (e.message !== "no autenticado") toast(`Organización: ${e.message}`, true);
+  } finally {
+    layoutLoaded();
   }
 }
 
