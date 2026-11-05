@@ -159,6 +159,7 @@ function fillUnitSheet(u) {
   $("sh-toggle").classList.toggle("btn-danger", u.up);
 }
 
+let flushQueued = false;  // un solo repintado por fotograma, lleguen los mensajes que lleguen
 function flushLogs() {
   if (paused || !pending) return;
   const pre = $("sh-logs");
@@ -179,7 +180,11 @@ function openSheet(name) {
   $("sheet").hidden = false;
   const u = units.find((x) => x.name === name);
   logWs = new WebSocket(wsUrl(u ? `/ws/unit-logs/${u.scope}/${encodeURIComponent(u.unit)}` : `/ws/logs/${encodeURIComponent(name)}`));
-  logWs.onmessage = (e) => { pending += e.data.replace(ANSI, ""); requestAnimationFrame(flushLogs); };
+  logWs.onmessage = (e) => {
+    pending += e.data.replace(ANSI, "");
+    if (pending.length > 200000) pending = pending.slice(-150000);  // en pausa, que no crezca sin fin
+    if (!flushQueued) { flushQueued = true; requestAnimationFrame(() => { flushQueued = false; flushLogs(); }); }
+  };
   logWs.onclose = (e) => { if (e.code === 4401) location.reload(); };
 }
 
@@ -240,6 +245,7 @@ export function show(args = []) {
     const name = decodeURIComponent(args[1]);
     (items.length ? Promise.resolve() : load()).then(() => { if (items.some((x) => x.name === name)) openSheet(name); });
   }
+  if (open && !logWs && !$("sheet").hidden) openSheet(open);
   if (timer) return;
   load();
   for (const fn of showHooks) fn();
@@ -249,6 +255,9 @@ export function show(args = []) {
 export function hide() {
   clearInterval(timer);
   timer = null;
+  // con la pantalla bloqueada o en otra app, los logs dejan de llegar (el servidor deja de seguirlos); al volver,
+  // se abren de nuevo con las últimas líneas
+  if (logWs) { logWs.onclose = null; logWs.close(); logWs = null; }
 }
 
 export function leave() {
