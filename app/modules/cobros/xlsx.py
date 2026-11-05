@@ -5,9 +5,12 @@ líneas, forma de pago y los tipos de IVA y retención); el diseño, las fórmul
 Se escribe también el resultado de las fórmulas (y se pide recalcular al abrir) para que se vea bien en cualquier
 programa. Sin librerías: un .xlsx es un zip con XML."""
 import io
+import os
 import re
 import zipfile
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
+from pathlib import Path
 from xml.sax.saxutils import escape
 
 SHEET, INFO = "Factura", "Instrucciones"
@@ -19,6 +22,36 @@ NEEDED = {SHEET: ["D1", "D2", "A12", "A13", "A14", "A15", "D23", "C24", "D24", "
 
 class TemplateError(ValueError):
     pass
+
+
+def _cents(v: Decimal) -> Decimal:
+    return v.quantize(Decimal("0.01"), ROUND_HALF_UP)
+
+
+def round2(v) -> float:
+    """A dos decimales, los medios hacia arriba: como REDONDEAR en la plantilla (el round() de Python no)."""
+    return float(_cents(Decimal(str(v))))
+
+
+def line_amount(qty, price) -> float:
+    return float(_cents(Decimal(str(qty)) * Decimal(str(price))))
+
+
+def amounts(base, iva, irpf) -> tuple[float, float, float]:
+    """(IVA, retención, total) de una base: las mismas cuentas en la app y en la factura."""
+    b = Decimal(str(base))
+    tax, ret = (_cents(b * Decimal(str(r)) / 100) for r in (iva, irpf))
+    return float(tax), float(ret), float(_cents(b + tax - ret))
+
+
+def write_private(path: Path, blob: bytes) -> None:
+    """A un temporal (solo lo lee el panel) y se cambia de golpe: un corte a medias no deja el archivo roto."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.parent / f".{path.name}.tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(blob)
+    os.replace(tmp, path)
 
 
 def _sheets(z: zipfile.ZipFile) -> dict[str, str]:
@@ -47,9 +80,6 @@ class _Sheet:
         if not m:
             raise TemplateError(f"La plantilla no tiene la celda {self.name}!{ref}: ¿le has cambiado el diseño?")
         return m
-
-    def has(self, ref) -> bool:
-        return bool(_cell_re(ref).search(self.xml))
 
     def _put(self, m, ref, inner, t=None):
         s = re.search(r'\bs="(\d+)"', m.group("attrs") or "")
@@ -126,14 +156,14 @@ def fill(blob: bytes, inv: dict, client: dict, base: float, iva: float, irpf: fl
         f.text(f"A{r}", ln["concept"] if ln else "")
         f.number(f"B{r}", ln["qty"] if ln else None)
         f.number(f"C{r}", ln["price"] if ln else None)
-        f.result(f"D{r}", round(ln["qty"] * ln["price"], 2) if ln else "")
-    tax, ret = round(base * iva / 100, 2), round(base * irpf / 100, 2)
+        f.result(f"D{r}", line_amount(ln["qty"], ln["price"]) if ln else "")
+    tax, ret, due = amounts(base, iva, irpf)
     f.result("D23", base)
     f.result("C24", f"IVA {_pct(iva)} %")
     f.result("D24", tax)
     f.result("C25", f"Retención IRPF {_pct(irpf)} %")
     f.result("D25", -ret)
-    f.result("D26", round(base + tax - ret, 2))
+    f.result("D26", due)
     if inv.get("pay_text"):
         f.text("A30", inv["pay_text"])
     info.number("B15", round(iva / 100, 4))

@@ -275,3 +275,289 @@ def test_alerts_once_a_day(st):
     assert "sin pagar todavía" in msg
     assert asyncio.run(a.tick(0, nine(date(2026, 11, 6)))) == []     # cada cosa, una vez
     assert ch["id"] in {x["id"] for x in st.load()["charges"]}
+
+
+# ---------- importes: como en la plantilla y como se escriben en España ----------
+
+def test_rounding_is_half_up_like_the_template():
+    assert total({"base": 12.5, "iva": 21, "irpf": 0}) == 15.13       # IVA 2,625 → 2,63
+    assert total({"base": 4.1, "iva": 15, "irpf": 0}) == 4.72         # 0,615 → 0,62 (en binario, 0,61499…)
+    assert total({"base": 12.5, "iva": 0, "irpf": 21}) == 9.87        # la retención, igual
+
+
+def test_invoice_file_rounds_like_the_app():
+    inv = {"number": "1", "date": "2026-11-04", "lines": [{"concept": "x", "qty": 1, "price": 12.5}]}
+    z = zipfile.ZipFile(io.BytesIO(xlsx.fill(template(), inv, {"name": "A"}, 12.5, 21, 0)))
+    s = z.read("xl/worksheets/sheet1.xml").decode()
+    assert "<v>2.63</v>" in s and "<v>15.13</v>" in s
+
+
+def test_invoice_line_rounds_half_up(st):
+    d, _, c = base(st)
+    ch = st.upsert(d, "charges", {"client": c["id"], "concept": "x", "base": 1}, T)
+    st.invoice(d, ch, {"number": "A", "date": "2026-11-04", "lines": [{"concept": "x", "qty": 0.5, "price": 0.25}]})
+    assert ch["base"] == 0.13  # 0,125 → 0,13
+
+
+def test_money_understands_spanish_thousands():
+    assert money("1.234") == 1234 and money("12.000") == 12000 and money("1.234.567") == 1234567
+    assert money("1.234,50") == 1234.5
+    assert money("12.5") == 12.5 and money("12.50") == 12.5 and money("0.125") == 0.13  # no son miles
+    assert money(1.234) == 1.23  # un número de verdad (JSON) no se reinterpreta
+
+
+@pytest.mark.parametrize("bad", ["nan", "inf", "-inf", float("inf")])
+def test_money_rejects_non_finite(bad):
+    with pytest.raises(CobrosError):
+        money(bad)
+
+
+# ---------- editar una suscripción ----------
+
+def yearly_sub(st, start="2026-01-01"):
+    d, p, c = base(st)
+    s = st.upsert(d, "subs", {"client": c["id"], "product": p["id"], "plan": p["plans"][1]["id"], "start": start}, T)
+    return d, p, c, s
+
+
+def test_switching_paid_yearly_to_monthly_does_not_charge_paid_months(st):
+    d, p, c, s = yearly_sub(st)
+    [ch] = st.sync(d, T)
+    st.pay(ch, {"amount": total(ch)}, T)
+    st.upsert(d, "subs", {**s, "plan": p["plans"][0]["id"]}, T)
+    assert st.sync(d, T) == []                                         # lo pagado cubre hasta diciembre
+    assert [x["date"] for x in st.sync(d, date(2026, 12, 28))] == ["2027-01-01"]
+
+
+def test_status_skips_periods_already_covered(st):
+    d, p, c, s = yearly_sub(st)
+    [ch] = st.sync(d, T)
+    st.pay(ch, {"amount": total(ch)}, T)
+    st.upsert(d, "subs", {**s, "plan": p["plans"][0]["id"]}, T)
+    assert st.view(d, T)["status"][s["id"]]["next"] == "2027-01-01"
+
+
+def test_moving_the_start_replaces_unpaid_charges(st):
+    d, p, c = base(st)
+    s = st.upsert(d, "subs", {"client": c["id"], "product": p["id"], "plan": p["plans"][0]["id"], "start": "2026-10-01"}, T)
+    st.sync(d, T)
+    st.upsert(d, "subs", {**s, "start": "2026-10-15"}, T)
+    st.sync(d, T)
+    assert [x["date"] for x in d["charges"]] == ["2026-10-15"]
+
+
+def test_earlier_end_drops_unpaid_charges_after_it(st):
+    d, p, c = base(st)
+    s = st.upsert(d, "subs", {"client": c["id"], "product": p["id"], "plan": p["plans"][0]["id"], "start": "2026-08-01"}, T)
+    aug, sep, oct_, nov = sorted(st.sync(d, T), key=lambda x: x["date"])
+    st.pay(oct_, {"amount": 1}, T)                                     # cobrado a medias: no se toca
+    st.upsert(d, "subs", {**s, "end": "2026-09-01"}, T)
+    assert sorted(x["date"] for x in d["charges"]) == ["2026-08-01", "2026-10-01"]
+
+
+def test_changing_plan_regenerates_unpaid_charge_with_new_terms(st):
+    d, p, c = base(st)
+    st.upsert(d, "products", {"id": p["id"], "name": "ERP", "plans": [*p["plans"], {"name": "Pro", "price": 30, "period": "month"}]}, T)
+    p = d["products"][0]
+    s = st.upsert(d, "subs", {"client": c["id"], "product": p["id"], "plan": p["plans"][0]["id"], "start": "2026-11-01"}, T)
+    st.sync(d, T)
+    st.upsert(d, "subs", {**s, "plan": p["plans"][2]["id"]}, T)
+    [ch] = st.sync(d, T)
+    assert ch["base"] == 30 and ch["concept"].endswith("plan Pro") and len(d["charges"]) == 1
+
+
+def test_editing_only_notes_keeps_the_charges(st):
+    d, p, c, s = yearly_sub(st)
+    [ch] = st.sync(d, T)
+    st.upsert(d, "subs", {**s, "notes": "hola"}, T)
+    assert d["charges"] == [ch]
+
+
+def test_changing_a_plan_period_reconciles_its_subs(st):
+    d, p, c, s = yearly_sub(st, "2026-11-01")
+    st.sync(d, T)
+    plans = [p["plans"][0], {**p["plans"][1], "period": "month"}]
+    st.upsert(d, "products", {"id": p["id"], "name": "ERP", "plans": plans}, T)
+    [ch] = st.sync(d, T)
+    assert ch["period"] == ["2026-11-01", "2026-11-30"] and d["charges"] == [ch]
+
+
+# ---------- un cargo con factura no cambia de importe ----------
+
+def invoiced(st):
+    d, _, c = base(st)
+    ch = st.upsert(d, "charges", {"client": c["id"], "concept": "Web", "base": 100}, T)
+    st.invoice(d, ch, {"number": "2026-001", "date": "2026-11-04", "lines": [{"concept": "Web", "price": 100}], "iva": 21, "irpf": 7})
+    return d, c, ch
+
+
+@pytest.mark.parametrize("change", [{"irpf": 15}, {"iva": 0}, {"taxes": False}])
+def test_invoiced_charge_rejects_tax_changes(st, change):
+    d, c, ch = invoiced(st)
+    with pytest.raises(CobrosError, match="factura"):
+        st.upsert(d, "charges", {"id": ch["id"], "client": c["id"], "concept": "Web", "base": 100, **change}, T)
+
+
+def test_invoiced_charge_keeps_taxes_when_editing_notes(st):
+    d, c, ch = invoiced(st)
+    c["irpf"] = 15                                                     # el cliente cambia después
+    out = st.upsert(d, "charges", {"id": ch["id"], "client": c["id"], "concept": "Web", "base": 100, "notes": "n"}, T)
+    assert (out["iva"], out["irpf"], total(out), out["notes"]) == (21, 7, 114, "n")
+
+
+def test_editing_uninvoiced_charge_keeps_its_rates_unless_told(st):
+    d, _, c = base(st)
+    ch = st.upsert(d, "charges", {"client": c["id"], "concept": "Web", "base": 100, "iva": 10, "irpf": 2}, T)
+    out = st.upsert(d, "charges", {"id": ch["id"], "client": c["id"], "concept": "Web", "base": 200}, T)
+    assert (out["iva"], out["irpf"], out["taxes"]) == (10, 2, True)
+
+
+# ---------- números de factura ----------
+
+def test_removed_invoice_number_is_not_offered_again(st):
+    d, c, ch = invoiced(st)
+    st.uninvoice(d, ch, T)
+    assert ch["invoice"] is None and st.next_number(d, 2026) == "2026-002"
+    [a] = d["annulled"]
+    assert (a["number"], a["client"], a["removed"]) == ("2026-001", "Cliente SL", "2026-11-04")
+
+
+def test_annulled_number_survives_reload(st):
+    d, c, ch = invoiced(st)
+    st.uninvoice(d, ch, T)
+    st.save(d)
+    assert st.next_number(st.load(), 2026) == "2026-002"
+
+
+def test_typing_an_annulled_number_uses_it_again(st):
+    d, c, ch = invoiced(st)
+    st.uninvoice(d, ch, T)
+    st.invoice(d, ch, {"number": "2026-001", "date": "2026-11-04", "lines": [{"concept": "Web", "price": 100}]})
+    assert d["annulled"] == []
+
+
+def test_uninvoice_deletes_the_file(st):
+    d, c, ch = invoiced(st)
+    st.save_template(template())
+    st.write_invoice(d, ch)
+    path = st.invoice_file(d, ch)
+    st.uninvoice(d, ch, T)
+    assert not path.exists()
+
+
+# ---------- borrar un cobro ----------
+
+def paid_auto(st):
+    d, _, c = base(st)
+    ch = st.upsert(d, "charges", {"client": c["id"], "concept": "Web", "base": 100}, T)
+    st.pay(ch, {"amount": total(ch)}, T)
+    assert st.auto_invoice(d, ch)
+    return d, c, ch
+
+
+def test_unpay_undoes_the_automatic_invoice(st):
+    d, c, ch = paid_auto(st)
+    st.save_template(template())
+    st.write_invoice(d, ch)
+    path = st.invoice_file(d, ch)
+    st.unpay(d, ch, 0, T)
+    assert ch["invoice"] is None and not path.exists() and ch["payments"] == []
+
+
+def test_paying_again_reuses_the_undone_number_with_new_details(st):
+    d, c, ch = paid_auto(st)
+    st.unpay(d, ch, 0, T)
+    other = st.upsert(d, "charges", {"client": c["id"], "concept": "Otra", "base": 1}, T)
+    st.invoice(d, other, {"number": st.next_number(d, 2026), "date": "2026-11-04", "lines": [{"concept": "x", "price": 1}]})
+    assert other["invoice"]["number"] == "2026-002"                    # el 001 sigue reservado
+    st.pay(ch, {"amount": total(ch), "method": "bizum", "date": "2026-11-20"}, T)
+    assert st.auto_invoice(d, ch)
+    inv = ch["invoice"]
+    assert (inv["number"], inv["date"], inv["pay_text"]) == ("2026-001", "2026-11-20", "Pagada por Bizum")
+    assert d["annulled"] == []
+
+
+def test_undone_number_of_another_year_is_not_reused(st):
+    d, c, ch = paid_auto(st)
+    st.unpay(d, ch, 0, T)
+    st.pay(ch, {"amount": total(ch), "date": "2027-01-10"}, T)
+    assert st.auto_invoice(d, ch) and ch["invoice"]["number"] == "2027-001"
+    assert [a["number"] for a in d["annulled"]] == ["2026-001"]
+
+
+def test_unpay_keeps_a_manual_invoice(st):
+    d, c, ch = invoiced(st)
+    st.pay(ch, {"amount": total(ch)}, T)
+    st.unpay(d, ch, 0, T)
+    assert ch["invoice"]["number"] == "2026-001"
+
+
+def test_unpay_keeps_an_automatic_invoice_edited_by_hand(st):
+    d, c, ch = paid_auto(st)
+    st.invoice(d, ch, {"number": "2026-001", "date": "2026-11-04", "lines": [{"concept": "Web a medida", "price": 100}]})
+    st.unpay(d, ch, 0, T)
+    assert ch["invoice"]["lines"][0]["concept"] == "Web a medida"
+
+
+def test_unpay_api_undoes_the_invoice(api):
+    cid = api.post("/api/cobros/clients", json={"name": "Ana"}).json()["saved"]
+    ch = api.post("/api/cobros/charges", json={"client": cid, "concept": "Soporte", "base": 10, "irpf": 0}).json()["saved"]
+    assert api.post(f"/api/cobros/charges/{ch}/pay", json={"amount": 12.1}).status_code == 200
+    r = api.delete(f"/api/cobros/charges/{ch}/pay/0").json()
+    x = next(x for x in r["charges"] if x["id"] == ch)
+    assert x["invoice"] is None and x["left"] == 12.1 and r["annulled"][0]["number"].endswith("-001")
+
+
+# ---------- cobrar de más ----------
+
+def test_cannot_collect_more_than_is_left(st):
+    d, _, c = base(st)
+    ch = st.upsert(d, "charges", {"client": c["id"], "concept": "Web", "base": 100}, T)
+    st.pay(ch, {"amount": 114}, T)
+    with pytest.raises(CobrosError, match="queda"):
+        st.pay(ch, {"amount": 114}, T)
+    assert len(ch["payments"]) == 1
+
+
+def test_double_pay_request_counts_once(api):
+    cid = api.post("/api/cobros/clients", json={"name": "Ana"}).json()["saved"]
+    ch = api.post("/api/cobros/charges", json={"client": cid, "concept": "Soporte", "base": 10}).json()["saved"]
+    assert api.post(f"/api/cobros/charges/{ch}/pay", json={"amount": 11.4}).status_code == 200
+    assert api.post(f"/api/cobros/charges/{ch}/pay", json={"amount": 11.4}).status_code == 400
+
+
+# ---------- cargos a cliente sin impuestos ----------
+
+def test_zero_rate_client_charge_is_still_invoiced(tmp_path):
+    st = Store(str(tmp_path), lambda: {"iva": 0, "irpf": 0})
+    d = st.load()
+    c = st.upsert(d, "clients", {"name": "Particular", "irpf": 0}, T)
+    ch = st.upsert(d, "charges", {"client": c["id"], "concept": "Web", "base": 100}, T)
+    assert ch["taxes"] is True and total(ch) == 100
+    st.pay(ch, {"amount": 100}, T)
+    assert st.auto_invoice(d, ch) and ch["invoice"]["number"] == "2026-001"
+
+
+def test_generated_zero_rate_fee_is_invoiced(tmp_path):
+    st = Store(str(tmp_path), lambda: {"iva": 0})
+    d = st.load()
+    p = st.upsert(d, "products", {"name": "E", "plans": [{"name": "B", "price": 10, "period": "month"}]}, T)
+    c = st.upsert(d, "clients", {"name": "P", "irpf": 0}, T)
+    st.upsert(d, "subs", {"client": c["id"], "product": p["id"], "plan": p["plans"][0]["id"], "start": "2026-11-01"}, T)
+    [ch] = st.sync(d, T)
+    st.pay(ch, {"amount": 10}, T)
+    assert st.auto_invoice(d, ch)
+
+
+def test_client_charge_without_taxes_is_not_pending_invoice(st):
+    d, _, c = base(st)
+    st.upsert(d, "charges", {"client": c["id"], "concept": "Favor", "base": 5, "taxes": False}, T)
+    assert st.view(d, T)["summary"]["uninvoiced"] == 0
+
+
+def test_old_data_gets_the_taxes_flag(st):
+    st.dir.mkdir(parents=True)
+    st.path.write_text('{"charges": [{"id": "a", "iva": 21, "irpf": 0, "invoice": null},'
+                       ' {"id": "b", "iva": 0, "irpf": 0, "invoice": null},'
+                       ' {"id": "c", "iva": 0, "irpf": 0, "invoice": {"number": "1"}}]}')
+    assert [c["taxes"] for c in st.load()["charges"]] == [True, False, True]

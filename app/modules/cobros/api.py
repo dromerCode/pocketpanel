@@ -8,7 +8,7 @@ from fastapi.responses import Response
 from ... import auth
 from ...core import json_body
 from .store import CobrosError, Store, paid, total
-from .xlsx import TemplateError, check, fill
+from .xlsx import TemplateError, check
 
 log = logging.getLogger("pocketpanel.cobros")
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -134,7 +134,7 @@ def setup(ctx) -> APIRouter:
 
     @r.delete("/charges/{id_}/pay/{i}")
     async def unpay(id_: str, i: int):
-        return change(lambda d: store.unpay(store.charge(d, id_), i))
+        return change(lambda d: store.unpay(d, store.charge(d, id_), i, today()))
 
     @r.post("/charges/{id_}/invoice")
     async def invoice(id_: str, request: Request):
@@ -148,11 +148,7 @@ def setup(ctx) -> APIRouter:
 
     @r.delete("/charges/{id_}/invoice")
     async def uninvoice(id_: str):
-        def drop(d):
-            c = store.charge(d, id_)
-            store.drop_invoice(c)
-            c["invoice"] = None
-        return change(drop)
+        return change(lambda d: store.uninvoice(d, store.charge(d, id_), today()))
 
     @r.get("/charges/{id_}/factura.xlsx")
     async def download(id_: str):

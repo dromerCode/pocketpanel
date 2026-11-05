@@ -1,5 +1,6 @@
 import { api, el, toast } from "/js/api.js";
 import { closeSheet, initSheet, openSheet } from "/js/ui.js";
+import { monthText, num, pct, round2, totalOf } from "./calc.js";
 
 const sheet = (title, sub, ...body) => openSheet(title, sub, ...body.flat(Infinity));
 
@@ -17,9 +18,7 @@ const STEP = { month: 1, quarter: 3, year: 12 };
 const D = (iso) => new Date(`${iso}T12:00:00`);
 const fd = (iso) => (iso ? D(iso).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) : "—");
 const dmy = (iso) => D(iso).toLocaleDateString("es-ES", { day: "2-digit", month: "2-digit", year: "numeric" });
-const num = (v) => { v = String(v ?? "").trim().replace(/€|\s/g, ""); if (v.includes(",")) v = v.replace(/\./g, "").replace(",", "."); return Number(v); };
 const dec = (n) => (n == null || n === "" ? "" : (Number.isInteger(+n) ? String(+n) : (+n).toFixed(2)).replace(".", ","));
-const totalOf = (base, iva, irpf) => Math.round((base + Math.round(base * iva) / 100 - Math.round(base * irpf) / 100) * 100) / 100;
 
 const client = (id) => S.clients.find((c) => c.id === id);
 const charge = (id) => S.charges.find((c) => c.id === id);
@@ -54,7 +53,7 @@ function periodShort(c) {
 function invoiceConcept(c) {
   if (!c.period) return c.concept;
   const p = monthly(c)
-    ? `mes de ${D(c.period[0]).toLocaleDateString("es-ES", { month: "long", year: "numeric" }).replace(" ", " de ")}`
+    ? `mes de ${monthText(c.period[0])}`
     : `del ${dmy(c.period[0])} al ${dmy(c.period[1])}`;
   return `${c.concept}\n(${p})`;
 }
@@ -309,14 +308,23 @@ function payDialog(id) {
   const method = chips(METHODS, c.payments.at(-1)?.method || store.get("method", c.client ? "transferencia" : "bizum"));
   const when = input({ type: "date", value: S.today });
   const part = money(Math.round(c.left * 50) / 100);
+  const full = btn(`Sí, pagado (${eur(c.left)})`, () => pay(c.left), "btn-primary");
+  const savePart = btn("Apuntar esta parte", () => pay(num(part.value)), "btn-primary");
   const partBox = el("div", { class: "form", hidden: true },
     el("div", { class: "cb-two" }, field("Cuánto te ha pagado", part), el("div", { class: "chips cb-chips-end" },
       el("button", { type: "button", onclick: () => { part.value = dec(Math.round(c.left * 50) / 100); } }, "La mitad"))),
-    btn("Apuntar esta parte", () => pay(num(part.value)), "btn-primary"));
+    savePart);
+  let busy = false;
   const pay = async (n) => {
+    if (busy) return;  // un doble toque con la red lenta no apunta el cobro dos veces
     if (!(n > 0)) return toast("¿Cuánto te ha pagado?", true);
     store.set("method", method.get());
-    if (!await call(`/charges/${id}/pay`, "POST", { amount: n, method: method.get(), date: when.value })) return;
+    busy = full.disabled = savePart.disabled = true;
+    try {
+      if (!await call(`/charges/${id}/pay`, "POST", { amount: n, method: method.get(), date: when.value })) return;
+    } finally {
+      busy = full.disabled = savePart.disabled = false;
+    }
     const after = charge(id);
     if (after.left > 0) { toast(`Apuntado: quedan ${eur(after.left)}`); return payDialog(id); }
     toast(`Cobrado ${eur(after.total)} ✓`);
@@ -330,7 +338,7 @@ function payDialog(id) {
     el("div", { class: "form" },
       el("div", { class: "cb-two" }, field("Cómo", method.box), field("Cuándo", when)),
       el("div", { class: "btn-row" },
-        btn(`Sí, pagado (${eur(c.left)})`, () => pay(c.left), "btn-primary"),
+        full,
         btn("Solo una parte", (e) => { partBox.hidden = !partBox.hidden; e.currentTarget.hidden = true; part.select(); })),
       partBox),
     el("div", { class: "btn-row cb-sheet-foot" },
@@ -425,7 +433,7 @@ function openCharge(id) {
       inv && S.template ? el("a", { class: "btn btn-primary", href: `/api/cobros/charges/${id}/factura.xlsx`, download: "" }, "Descargar (.xlsx)") : null,
       inv ? btn("Cambiar", () => invoiceForm(id)) : c.client ? btn("Hacer factura", () => invoiceForm(id), "btn-primary") : null,
       inv ? btn("Quitar", async () => {
-        if (!confirm(`¿Quitar la factura ${inv.number} de aquí? Si ya la enviaste, ese número no se puede reutilizar: haz una rectificativa.`)) return;
+        if (!confirm(`¿Quitar la factura ${inv.number}? Su número queda anulado. Si ya la enviaste, haz una rectificativa.`)) return;
         if (await call(`/charges/${id}/invoice`, "DELETE")) openCharge(id);
       }) : null)];
 
@@ -441,7 +449,8 @@ function openCharge(id) {
       el("span", {}, `${fd(p.date)} · ${METHODS.find((m) => m[0] === p.method)?.[1] || p.method}`),
       el("b", { class: "mono" }, eur(p.amount)),
       el("button", { class: "x", type: "button", title: "Borrar este cobro", onclick: async () => {
-        if (!confirm(`¿Borrar el cobro de ${eur(p.amount)} del ${fd(p.date)}?`)) return;
+        const undo = inv?.auto && round2(c.left + p.amount) > 0;  // deja de estar pagado: su factura automática se va
+        if (!confirm(`¿Borrar el cobro de ${eur(p.amount)} del ${fd(p.date)}?${undo ? ` Se quitará también la factura ${inv.number}; recuperará ese número cuando vuelva a estar pagado. Si ya la enviaste, haz una rectificativa.` : ""}`)) return;
         if (await call(`/charges/${id}/pay/${i}`, "DELETE")) openCharge(id);
       } }, "✕"))))] : null,
     ...pay, ...invoice,
@@ -464,30 +473,35 @@ function chargeForm(c, clientId, whoName) {
   const whoIn = input({ value: c.who, placeholder: "Nombre", maxlength: 120 });
   const concept = input({ value: c.concept, required: true, placeholder: "p. ej. Página web (50 % al empezar)", maxlength: 300 });
   const base = money(c.base, { required: true });
-  const taxes = el("input", { type: "checkbox", checked: editing ? !!(c.iva || c.irpf) : !!c.client });
+  const taxes = el("input", { type: "checkbox", checked: editing ? c.taxes : !!c.client });
   const date = input({ type: "date", value: c.date, required: true });
   const notes = el("textarea", { maxlength: 2000, placeholder: "opcional" }, c.notes || "");
   const preview = el("p", { class: "cb-note" });
   const whoRow = field("Quién", whoIn);
-  const sync = () => {
+  const locked = editing && c.invoice;
+  // Al editar, sus tipos se quedan; si no los tenía o cambia de cliente, los de ahora
+  const rates = () => {
     const cl = client(pick.value);
-    whoRow.hidden = !!cl;
+    return { iva: editing && c.taxes ? c.iva : S.settings.iva,
+      irpf: editing && c.taxes && c.client === (cl ? cl.id : null) ? c.irpf : cl ? cl.irpf : 0 };
+  };
+  const sync = () => {
+    whoRow.hidden = !!client(pick.value);
     const b = num(base.value) || 0;
-    const irpf = cl ? cl.irpf : 0;
+    const { iva, irpf } = rates();
     preview.textContent = taxes.checked
-      ? `Te pagarán ${eur(totalOf(b, S.settings.iva, irpf))} (${eur(b)} + IVA ${dec(S.settings.iva)} %${irpf ? ` − IRPF ${dec(irpf)} %` : ""}).`
+      ? `Te pagarán ${eur(totalOf(b, iva, irpf))} (${eur(b)} + IVA ${dec(iva)} %${irpf ? ` − IRPF ${dec(irpf)} %` : ""}).`
       : `Te deben ${eur(b)}, sin IVA ni factura.`;
   };
   pick.onchange = () => { taxes.checked = !!client(pick.value); sync(); };
   base.oninput = taxes.onchange = sync;
   sync();
-  const locked = editing && c.invoice;
   sheet(editing ? "Editar" : "Nuevo cargo", editing ? who(c) : "un encargo, una instalación, algo que te deben…",
     form(async () => {
       const cl = client(pick.value);
       const body = { id: c.id, client: cl ? cl.id : null, who: cl ? "" : whoIn.value, concept: concept.value,
-        base: num(base.value), taxes: taxes.checked, date: date.value, due: c.due || null, notes: notes.value };
-      if (taxes.checked) { body.iva = c.iva ?? S.settings.iva; body.irpf = cl ? cl.irpf : 0; }
+        base: num(base.value), date: date.value, due: c.due || null, notes: notes.value };
+      if (!locked) { body.taxes = taxes.checked; if (taxes.checked) Object.assign(body, rates()); }
       const res = await call("/charges", "POST", body);
       if (res) { toast("Guardado"); openCharge(res.saved); }
     },
@@ -497,10 +511,10 @@ function chargeForm(c, clientId, whoName) {
     el("label", { class: "cb-check" }, taxes, "Con IVA y retención (lleva factura)"),
     preview,
     field("Notas", notes),
-    locked ? el("p", { class: "cb-note" }, "Tiene factura: el cliente y el importe salen de ella (cámbiala desde «Factura»).") : null,
+    locked ? el("p", { class: "cb-note" }, "Tiene factura: el cliente, el importe y los impuestos salen de ella (cámbiala desde «Factura»).") : null,
     el("p", { class: "cb-note" }, "Para un pago a plazos, pon el total y ve apuntando cada cobro (hay un botón «La mitad»)."),
     submit("Guardar")));
-  if (locked) { pick.disabled = true; base.disabled = true; }
+  if (locked) { pick.disabled = true; base.disabled = true; taxes.disabled = true; }
   (editing ? concept : pick).focus();
 }
 
@@ -514,16 +528,16 @@ function invoiceForm(id) {
       : S.settings.iban ? `Transferencia bancaria a la cuenta ${S.settings.iban}` : "" };
   const number = input({ value: inv.number, required: true, class: "mono" });
   const date = input({ type: "date", value: inv.date, required: true });
-  const iva = money(c.iva || S.settings.iva);
-  const irpf = money(c.invoice ? c.irpf : cl?.irpf ?? 0);
+  const iva = money(c.taxes ? c.iva : S.settings.iva);
+  const irpf = money(c.taxes ? c.irpf : cl?.irpf ?? 0);
   const payText = input({ value: inv.pay_text || "", placeholder: "Forma de pago" });
   const lines = el("div", { class: "form" });
   const totalBox = el("div", { class: "cb-total" });
   const rows = [];
   const recalc = () => {
-    const base = rows.reduce((t, r) => t + Math.round((num(r.qty.value) || 0) * (num(r.price.value) || 0) * 100) / 100, 0);
+    const base = rows.reduce((t, r) => t + round2((num(r.qty.value) || 0) * (num(r.price.value) || 0)), 0);
     const i = num(iva.value) || 0, r = num(irpf.value) || 0;
-    totalBox.replaceChildren(el("span", { class: "muted" }, `${eur(base)} + IVA ${eur(Math.round(base * i) / 100)}${r ? ` − IRPF ${eur(Math.round(base * r) / 100)}` : ""}`), el("b", {}, eur(totalOf(base, i, r))));
+    totalBox.replaceChildren(el("span", { class: "muted" }, `${eur(base)} + IVA ${eur(pct(base, i))}${r ? ` − IRPF ${eur(pct(base, r))}` : ""}`), el("b", {}, eur(totalOf(base, i, r))));
   };
   const addLine = (ln) => {
     if (rows.length >= 4) return toast("En la plantilla caben 4 líneas", true);
@@ -582,6 +596,8 @@ function openTemplate(back) {
     el("p", { class: "cb-note" }, "Tu .xlsx con las pestañas «Factura» e «Instrucciones». Al hacer una factura se rellena una copia con el número, la fecha, el cliente, las líneas, la forma de pago y los tipos de IVA y retención; lo demás (tus datos, el diseño) se queda como lo tengas."),
     el("p", { class: "cb-note" }, "No cambies de sitio esas celdas (D1, D2, A12–A15, A18–C21, A30 e Instrucciones B15–B16)."),
     el("p", { class: "cb-note" }, "Cada factura que hagas se guarda ya rellena en ", el("span", { class: "mono" }, S.folder), " (una carpeta por año). Cambiar la plantilla no toca las ya hechas."),
+    S.annulled.length ? [el("h3", { class: "section-title" }, "Números anulados"), el("ul", { class: "cb-rows" }, ...S.annulled.map((a) => el("li", {},
+      el("span", {}, `${a.client} · quitada el ${fd(a.removed)}`), el("b", { class: "mono" }, a.number))))] : null,
     file,
     el("div", { class: "btn-row" },
       btn(S.template ? "Cambiar plantilla" : "Subir plantilla", () => file.click(), "btn-primary"),

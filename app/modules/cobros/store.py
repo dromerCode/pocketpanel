@@ -6,6 +6,7 @@
   charges   lo que te tienen que pagar: las cuotas que salen solas de las suscripciones, los encargos (una web,
             con pagos a plazos) y los apuntes sueltos (alguien que te debe algo). Cada uno con sus cobros y,
             si la tiene, los datos de su factura.
+  annulled  los números de factura que se quitaron: no se vuelven a ofrecer, y queda constancia de cada uno
 
 Cada factura hecha se guarda rellena en data/cobros/facturas/<año>/ (una vez hecha no se vuelve a tocar, aunque
 cambies la plantilla o los datos del cliente).
@@ -13,13 +14,12 @@ cambies la plantilla o los datos del cliente).
 Los importes van sin IVA (`base`); lo que te pagan es base + IVA − retención, como en la plantilla."""
 import calendar
 import json
-import os
 import re
 import secrets
 from datetime import date, timedelta
 from pathlib import Path
 
-from .xlsx import fill
+from .xlsx import amounts, fill, line_amount, round2, write_private
 
 PERIODS = {"month": 1, "quarter": 3, "year": 12}
 METHODS = ("transferencia", "efectivo", "bizum", "tarjeta", "otro")
@@ -28,6 +28,7 @@ PAID_AS = {"transferencia": "Pagada por transferencia", "efectivo": "Pagada en e
 MONTHS = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre",
           "noviembre", "diciembre")
 KINDS = ("products", "clients", "subs", "charges")
+TERMS = ("client", "product", "plan", "price")  # si cambian, las cuotas sin cobrar se vuelven a sacar
 
 
 class CobrosError(ValueError):
@@ -39,20 +40,22 @@ def new_id() -> str:
 
 
 def money(v, what="importe", allow_negative=False) -> float:
-    """«12,50», «12.5» o 12.5 → 12.5."""
+    """«12,50», «12.5» o 12.5 → 12.5; «1.234» son miles, como se escribe aquí (un 1.234 de JSON, no)."""
     if isinstance(v, bool):
         raise CobrosError(f"{what}: no es un número")
     if isinstance(v, str):
         v = v.strip().replace("€", "").replace(" ", "")
         if "," in v:
             v = v.replace(".", "").replace(",", ".")
+        elif re.fullmatch(r"-?[1-9]\d{0,2}(\.\d{3})+", v):
+            v = v.replace(".", "")
     try:
-        n = round(float(v), 2)
+        n = float(v)
     except (TypeError, ValueError):
         raise CobrosError(f"{what}: no es un número") from None
     if n != n or abs(n) > 1e9 or (n < 0 and not allow_negative):
         raise CobrosError(f"{what}: fuera de rango")
-    return n
+    return round2(n)
 
 
 def day(v, what="fecha", optional=False) -> str | None:
@@ -76,12 +79,16 @@ def add_months(d: date, n: int) -> date:
 
 def total(c: dict) -> float:
     """Lo que hay que cobrar: base + IVA − retención (redondeados como en la plantilla)."""
-    b = c["base"]
-    return round(b + round(b * c["iva"] / 100, 2) - round(b * c["irpf"] / 100, 2), 2)
+    return amounts(c["base"], c["iva"], c["irpf"])[2]
 
 
 def paid(c: dict) -> float:
     return round(sum(p["amount"] for p in c["payments"]), 2)
+
+
+def covered(spans: list, a: date, b: date) -> bool:
+    """¿Algún periodo ya sacado pisa el de a a b? (si la suscripción cambió, no empiezan el mismo día)"""
+    return any(x <= b.isoformat() and a.isoformat() <= y for x, y in spans)
 
 
 class Store:
@@ -103,24 +110,17 @@ class Store:
             raise CobrosError(f"{self.path} está roto: {e}") from None
         for k in KINDS:
             d.setdefault(k, [])
+        d.setdefault("annulled", [])
+        for c in d["charges"]:  # los guardados antes de existir `taxes`
+            c.setdefault("taxes", bool(c["iva"] or c["irpf"] or c["invoice"]))
         return d
 
     def save(self, d: dict) -> None:
         """A un temporal y se cambia de golpe: un corte a medias no deja el JSON roto."""
-        self.dir.mkdir(parents=True, exist_ok=True)
-        tmp = self.dir / ".cobros.json.tmp"
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as f:
-            json.dump(d, f, indent=1, ensure_ascii=False)
-        os.replace(tmp, self.path)
+        write_private(self.path, json.dumps(d, indent=1, ensure_ascii=False).encode())
 
     def save_template(self, blob: bytes) -> None:
-        self.dir.mkdir(parents=True, exist_ok=True)
-        tmp = self.dir / ".plantilla.tmp"
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "wb") as f:
-            f.write(blob)
-        os.replace(tmp, self.template)
+        write_private(self.template, blob)
 
     # ---------- ajustes ----------
 
@@ -162,7 +162,10 @@ class Store:
     def sync(self, d: dict, today: date) -> list[dict]:
         """Saca las cuotas que ya tocan (hasta `lead_days` antes de que empiece el periodo). Devuelve las nuevas."""
         limit = today + timedelta(days=int(self.opt("lead_days", 7)))
-        have = {(c.get("sub"), (c.get("period") or [None])[0]) for c in d["charges"]}
+        spans: dict[str, list] = {}
+        for c in d["charges"]:
+            if c.get("sub") and c.get("period"):
+                spans.setdefault(c["sub"], []).append(c["period"])
         clients = {c["id"]: c for c in d["clients"]}
         new = []
         for s in d["subs"]:
@@ -173,17 +176,28 @@ class Store:
             for a, b in self.periods(s, plan):
                 if a > limit:
                     break
-                if (s["id"], a.isoformat()) in have:
+                if covered(spans.get(s["id"], []), a, b):
                     continue
                 c = {"id": new_id(), "client": cl["id"], "who": "", "sub": s["id"],
                      "concept": f"Suscripción {ADJ[plan['period']]} a {prod['name']}, {plan_label(plan['name'])}",
                      "period": [a.isoformat(), b.isoformat()], "date": a.isoformat(), "due": None,
                      "base": s["price"] if s.get("price") is not None else plan["price"],
-                     "iva": self.iva(), "irpf": cl.get("irpf", 0.0), "payments": [], "invoice": None,
+                     "iva": self.iva(), "irpf": cl.get("irpf", 0.0), "taxes": True, "payments": [], "invoice": None,
                      "notes": "", "alerted": []}
                 d["charges"].append(c)
                 new.append(c)
         return new
+
+    def _reconcile(self, d: dict, s: dict, old: dict) -> None:
+        """Tras cambiar una suscripción: fuera las cuotas sin cobrar ni facturar que ya no tocan (o con otras
+        condiciones; sync saca las nuevas). Lo cobrado o facturado se queda y sync no vuelve a cobrar esos días."""
+        _, plan = self.plan_of(d, s)
+        if not plan:
+            return
+        valid = {(a.isoformat(), b.isoformat()) for a, b in self.periods(s, plan)}
+        same = all(s.get(k) == old.get(k) for k in TERMS)
+        d["charges"] = [c for c in d["charges"] if c.get("sub") != s["id"] or c["payments"] or c["invoice"]
+                        or (same and tuple(c["period"]) in valid)]
 
     # ---------- altas y cambios ----------
 
@@ -198,6 +212,14 @@ class Store:
             items[items.index(old)] = item
         else:
             items.append(item)
+        if old and kind == "subs":
+            self._reconcile(d, item, old)
+        if old and kind == "products":
+            before = {p["id"]: p["period"] for p in old["plans"]}
+            moved = {p["id"] for p in item["plans"] if before.get(p["id"], p["period"]) != p["period"]}
+            for s in d["subs"]:
+                if s["product"] == old["id"] and s["plan"] in moved:
+                    self._reconcile(d, s, s)
         return item
 
     def _clean_products(self, d, b, old, today):
@@ -257,21 +279,26 @@ class Store:
         concept = text(b.get("concept"), 300)
         if not concept and cl:  # a un cliente se le factura: hace falta; un apunte suelto puede ir sin él
             raise CobrosError("Falta el concepto")
-        taxes = bool(b.get("taxes", cl is not None))  # un apunte suelto (un amigo, un préstamo) va sin IVA
-        iva = money(b.get("iva", self.iva()), "IVA") if taxes else 0.0
-        irpf = money(b.get("irpf", cl.get("irpf", 0) if cl else 0), "retención") if taxes else 0.0
         keep = old or {}
-        if keep.get("invoice") and (keep.get("client") != client or keep["base"] != money(b.get("base"))):
-            raise CobrosError("Ya tiene factura: quítala antes de cambiar el cliente o el importe")
+        taxes = bool(b.get("taxes", keep.get("taxes", cl is not None)))  # un apunte suelto (un amigo…) va sin IVA
+        had = keep.get("taxes")  # al editar, sus tipos se quedan salvo que se pidan otros (o cambie de cliente)
+        iva = money(b.get("iva", keep["iva"] if had else self.iva()), "IVA") if taxes else 0.0
+        default = keep["irpf"] if had and keep["client"] == client else cl.get("irpf", 0) if cl else 0
+        irpf = money(b.get("irpf", default), "retención") if taxes else 0.0
+        base = money(b.get("base"))
+        if keep.get("invoice") and (keep["client"], keep["base"], keep["iva"], keep["irpf"]) != (client, base, iva, irpf):
+            raise CobrosError("Ya tiene factura: quítala antes de cambiar el cliente, el importe o los impuestos")
         return {"client": client, "who": who, "sub": keep.get("sub"), "period": keep.get("period"),
                 "concept": concept, "date": day(b.get("date") or today.isoformat()),
-                "due": day(b.get("due"), "vence", optional=True), "base": money(b.get("base")),
-                "iva": iva, "irpf": irpf, "payments": keep.get("payments", []), "invoice": keep.get("invoice"),
+                "due": day(b.get("due"), "vence", optional=True), "base": base,
+                "iva": iva, "irpf": irpf, "taxes": taxes, "payments": keep.get("payments", []), "invoice": keep.get("invoice"),
                 "notes": text(b.get("notes"), 2000), "alerted": keep.get("alerted", [])}
 
     def delete(self, d: dict, kind: str, id_: str) -> None:
-        items = d.get(kind)
-        item = next((x for x in items or [] if x["id"] == id_), None)
+        if kind not in KINDS:
+            raise CobrosError("tipo desconocido")
+        items = d[kind]
+        item = next((x for x in items if x["id"] == id_), None)
         if not item:
             raise CobrosError("No existe")
         if kind == "products" and any(s["product"] == id_ for s in d["subs"]):
@@ -285,7 +312,7 @@ class Store:
             d["charges"] = [c for c in d["charges"] if c.get("sub") != id_ or c["payments"] or c["invoice"]]
         if kind == "charges":
             if item["invoice"]:
-                raise CobrosError("Tiene factura: quítala antes (y apunta que ese número queda anulado)")
+                raise CobrosError("Tiene factura: quítala antes (su número queda anulado)")
             if item.get("sub"):  # que no vuelva a salir sola
                 s = next((s for s in d["subs"] if s["id"] == item["sub"]), None)
                 if s:
@@ -307,12 +334,28 @@ class Store:
         method = b.get("method") or "transferencia"
         if method not in METHODS:
             raise CobrosError("forma de pago desconocida")
+        left = round(total(c) - paid(c), 2)
+        if amount > left:  # también para un doble toque: el segundo ya no cabe
+            raise CobrosError(f"Solo queda por cobrar {left:.2f} €".replace(".", ","))
         c["payments"].append({"date": day(b.get("date") or today.isoformat()), "amount": amount, "method": method})
 
-    def unpay(self, c: dict, i: int) -> None:
+    def unpay(self, d: dict, c: dict, i: int, today: date) -> None:
+        """Si deja de estar pagado, su factura automática (dice «Pagada») se va; volverá con su número al cobrar."""
         if not 0 <= i < len(c["payments"]):
             raise CobrosError("Ese cobro no existe")
         c["payments"].pop(i)
+        if (c["invoice"] or {}).get("auto") and round(total(c) - paid(c), 2) > 0:
+            self.uninvoice(d, c, today, reusable=True)
+
+    def uninvoice(self, d: dict, c: dict, today: date, reusable: bool = False) -> None:
+        """Quita la factura y deja constancia de su número (no se vuelve a ofrecer). `reusable`: su cargo lo recupera."""
+        if not c["invoice"]:
+            raise CobrosError("No tiene factura")
+        cl = next((x for x in d["clients"] if x["id"] == c["client"]), {"name": c["who"]})
+        d["annulled"].append({"number": c["invoice"]["number"], "date": c["invoice"]["date"], "client": cl["name"],
+                              "charge": c["id"], "removed": today.isoformat(), "reusable": reusable})
+        self.drop_invoice(c)
+        c["invoice"] = None
 
     def invoice(self, d: dict, c: dict, b: dict) -> None:
         number = text(b.get("number"), 30)
@@ -328,11 +371,13 @@ class Store:
                           "price": money(ln.get("price"), "precio", allow_negative=True)})
         if not 1 <= len(lines) <= 4:
             raise CobrosError("La factura lleva de 1 a 4 líneas (las que caben en la plantilla)")
-        c["base"] = round(sum(round(x["qty"] * x["price"], 2) for x in lines), 2)
+        c["base"] = round2(sum(line_amount(x["qty"], x["price"]) for x in lines))
         if "iva" in b:
             c["iva"] = money(b["iva"], "IVA")
         if "irpf" in b:
             c["irpf"] = money(b["irpf"], "retención")
+        c["taxes"] = True
+        d["annulled"] = [a for a in d["annulled"] if a["number"] != number]
         c["invoice"] = {"number": number, "date": day(b.get("date"), "fecha de la factura"), "lines": lines,
                         "pay_text": text(b.get("pay_text"), 200), "file": (c["invoice"] or {}).get("file")}
 
@@ -357,13 +402,7 @@ class Store:
         name = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', " ", f"{c['invoice']['number']} {cl['name']}").strip()[:120]
         rel = f"{c['invoice']['date'][:4]}/{name}.xlsx"
         self.drop_invoice(c, keep=rel)
-        path = self.invoices / rel
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.parent / f".{path.name}.tmp"
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "wb") as f:
-            f.write(blob)
-        os.replace(tmp, path)
+        write_private(self.invoices / rel, blob)
         c["invoice"]["file"] = rel
 
     def drop_invoice(self, c: dict, keep: str | None = None) -> None:
@@ -381,9 +420,10 @@ class Store:
         return n
 
     def auto_invoice(self, d: dict, c: dict) -> bool:
-        """Al quedar pagado del todo, la factura de un cargo con IVA a un cliente se hace sola: siguiente número,
+        """Al quedar pagado del todo, la factura de un cargo con impuestos a un cliente se hace sola: siguiente número
+        (o el que ya tuvo, si se borró el cobro por error),
         fecha del último cobro, una línea con el concepto (y el periodo) y cómo se pagó. Si ya la tiene, nada."""
-        if c["invoice"] or not c["client"] or not (c["iva"] or c["irpf"]) or not c["payments"] \
+        if c["invoice"] or not c["client"] or not c["taxes"] or not c["payments"] \
                 or round(total(c) - paid(c), 2) > 0:
             return False
         last = max(c["payments"], key=lambda p: p["date"])
@@ -392,16 +432,21 @@ class Store:
             a, b = (date.fromisoformat(x) for x in c["period"])
             concept += (f"\n(mes de {MONTHS[a.month - 1]} de {a.year})" if add_months(a, 1) - timedelta(days=1) == b
                         else f"\n(del {a:%d/%m/%Y} al {b:%d/%m/%Y})")
-        self.invoice(d, c, {"number": self.next_number(d, int(last["date"][:4])), "date": last["date"],
+        year = last["date"][:4]
+        held = next((a["number"] for a in d["annulled"] if a.get("reusable") and a["charge"] == c["id"]
+                     and a["number"].startswith(f"{year}-")), None)
+        self.invoice(d, c, {"number": held or self.next_number(d, int(year)), "date": last["date"],
                             "lines": [{"concept": concept, "qty": 1, "price": c["base"]}],
                             "pay_text": PAID_AS.get(last["method"], "Pagada")})
+        c["invoice"]["auto"] = True  # si se borra el cobro, se deshace; si la cambias a mano, ya es tuya
         return True
 
     def next_number(self, d: dict, year: int) -> str:
-        """El siguiente correlativo del año (2026-001, 2026-002…), según las facturas apuntadas."""
+        """El siguiente correlativo del año (2026-001, 2026-002…), contando las facturas apuntadas y las anuladas."""
         best, width = 0, 3
-        for c in d["charges"]:
-            m = re.fullmatch(rf"{year}-(\d+)", (c["invoice"] or {}).get("number", ""))
+        used = [c["invoice"]["number"] for c in d["charges"] if c["invoice"]] + [a["number"] for a in d["annulled"]]
+        for number in used:
+            m = re.fullmatch(rf"{year}-(\d+)", number)
             if m:
                 best, width = max(best, int(m.group(1))), max(width, len(m.group(1)))
         return f"{year}-{best + 1:0{width}d}"
@@ -436,7 +481,7 @@ class Store:
                             "pending": sum(1 for c in charges if c["state"] != "paid" and c["date"] <= today.isoformat()),
                             "late_n": sum(1 for c in charges if c["state"] == "late"),
                             "upcoming": sum(1 for c in charges if c["state"] != "paid" and c["date"] > today.isoformat()),
-                            "uninvoiced": sum(1 for c in charges if c["client"] and not c["invoice"]
+                            "uninvoiced": sum(1 for c in charges if c["client"] and c["taxes"] and not c["invoice"]
                                               and c["date"] <= today.isoformat())}}
 
     def status(self, d: dict, charges: list[dict], today: date) -> tuple[dict, list[dict]]:
@@ -463,8 +508,8 @@ class Store:
                 c = unpaid[0]
                 st = {"state": "late" if c["date"] <= t else "ok", "next": c["date"], "charge": c["id"], "amount": c["left"]}
             else:
-                have = {c["period"][0] for c in cs if c.get("period")}
-                a = next((a for a, _ in self.periods(s, plan) if a.isoformat() not in have), None)
+                spans = [c["period"] for c in cs if c.get("period")]
+                a = next((a for a, b in self.periods(s, plan) if not covered(spans, a, b)), None)
                 base = s["price"] if s.get("price") is not None else plan["price"]
                 amount = total({"base": base, "iva": self.iva(), "irpf": cl.get("irpf", 0.0)})
                 st = {"state": "ok" if a else "end", "next": a.isoformat() if a else None, "charge": None, "amount": amount}
