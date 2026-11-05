@@ -6,6 +6,7 @@ const NS = "http://www.w3.org/2000/svg";
 let range = "anio";
 let data = null;
 let timer = null;
+let shown = false;  // si se sale de la pestaña con una carga a medias, esa carga no debe volver a programarse
 let discover = null;  // lo último que encontró «Descubrir» (se reaprovecha al volver a la pestaña)
 let discLimit = 10;
 
@@ -259,7 +260,7 @@ async function load() {
   render();
   await Promise.all([hero(), charts([...data.holdings, ...data.watchlist].map((x) => x.ticker))]);
   clearTimeout(timer);
-  timer = setTimeout(load, data.market_open ? 60_000 : 300_000);
+  if (shown) timer = setTimeout(load, data.market_open ? 60_000 : 300_000);
 }
 
 async function scan(limit) {
@@ -308,11 +309,13 @@ export function init() {
 }
 
 export function show() {
+  shown = true;
   load();
   if (!discover) scan(discLimit);
 }
 
 export function hide() {
+  shown = false;
   clearTimeout(timer);
 }
 
