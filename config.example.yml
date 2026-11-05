@@ -71,6 +71,15 @@ modules:
     radarr_url: ""             # http://127.0.0.1:7878
     notify_finished: true      # aviso push cuando termina una descarga
 
+  cobros:                      # lo que te deben tus clientes: suscripciones, encargos a plazos y facturas con tu plantilla
+    enabled: false
+    iva: "21"
+    irpf: "7"                  # retención por defecto de un cliente nuevo (particulares: 0)
+    due_days: 15               # días para pagar desde la cuota
+    lead_days: 7               # la cuota sale estos días antes de que empiece el periodo
+    iban: ""                   # para «Forma de pago» en las facturas
+    alerts: true               # aviso push de cuotas nuevas y vencidas (a las 9)
+
   stocks:                      # cartera de bolsa: recomendaciones por reglas, seguimiento y avisos por Telegram
     enabled: false             # al activarlo descarga curl_cffi (~38 MB, en data/deps); al apagarlo se borra
     broker: Trade Republic
