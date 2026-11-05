@@ -2,12 +2,22 @@
   <header class="topbar term-bar">
     <div id="term-tabs" class="term-tabs" role="tablist" aria-label="Sesiones"></div>
     <button id="term-new" class="icon-btn" title="Nueva sesión" aria-label="Nueva sesión">+</button>
+    <button id="term-split" class="icon-btn" title="Dividir: otra terminal al lado" aria-label="Dividir">
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M10 3.5v13"/></svg>
+    </button>
+    <button id="term-join" class="icon-btn" title="Quitar la división (las demás siguen en sus pestañas)"
+      aria-label="Quitar la división" hidden>
+      <svg viewBox="0 0 20 20" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <rect x="2.5" y="3.5" width="15" height="13" rx="2"/></svg>
+    </button>
     <button id="term-tmux" class="btn btn-sm" data-module="claude" title="tmux con Claude">tmux claude</button>
     <button id="term-reconnect" class="icon-btn" title="Reconectar" aria-label="Reconectar">↻</button>
   </header>
   <div id="term" class="term"></div>
   <div class="keys" id="term-keys">
     <button data-k="esc">Esc</button><button data-k="tab">Tab</button><button data-k="ctrl" class="mod">Ctrl</button>
+    <button data-act="copy" class="act">Copiar</button><button data-act="paste" class="act">Pegar</button>
     <button data-k="up">↑</button><button data-k="down">↓</button><button data-k="left">←</button><button data-k="right">→</button>
     <button data-k="|">|</button><button data-k="~">~</button><button data-k="/">/</button><button data-k="-">-</button>
   </div>
