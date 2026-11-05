@@ -355,7 +355,7 @@ function follow({ job, title }, verb) {
     if (j.status === "running") {
       const last = j.lines.at(-1)?.replace(/^\S+\s+/, "") || "";
       progress(`${verb}… ${last}`, null, () => watchJob(jobUrl, title, { ok: ["Hecho", true], failed: ["Ha fallado", false] }));
-      return setTimeout(poll, 1000);
+      return setTimeout(poll, document.hidden ? 5000 : 1000);  // con el móvil bloqueado, sin prisa
     }
     busy = false;
     progress(null);

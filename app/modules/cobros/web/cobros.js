@@ -109,6 +109,7 @@ const amount = (n, cls = "") => el("b", { class: `mono cb-amt ${cls}` }, eur(n))
 
 function render() {
   if (!S) return;
+  paintCard();  // el widget de Estado usa los mismos datos: al volver, ya está al día
   renderHub();
   renderMoves();
   renderBoard();
@@ -291,7 +292,6 @@ async function load() {
   try {
     S = await api("/api/cobros");
     render();
-    paintCard();
   } catch (e) {
     if (e.message !== "no autenticado") $("cb-hub").replaceChildren(empty(`No se pudo cargar: ${e.message}`));
   }

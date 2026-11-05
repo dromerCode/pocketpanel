@@ -15,6 +15,8 @@ class Job:
     def log(self, msg: str) -> None:
         log.info("[%s] %s", self.name, msg)
         self.lines.append(f"{time.strftime('%H:%M:%S')}  {msg}")
+        if len(self.lines) > 2000:  # una tarea muy habladora (copiar miles de archivos…) no se come la memoria
+            del self.lines[:-1000]
 
     def view(self) -> dict:
         return {"name": self.name, "status": self.status, "lines": self.lines[-300:], "started": int(self.started)}

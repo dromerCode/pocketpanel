@@ -5,7 +5,7 @@ import { closeProcs, initProcs } from "./procs.js";
 import { diskDot, initDisks, loadHealth, otherDisks } from "./disks.js";
 import { cards } from "./registry.js";
 import { initTailscale, loadTailscale } from "./tailscale.js";
-import { initWidgets, leaveWidgets } from "./widgets.js";
+import { initWidgets, layoutReady, leaveWidgets } from "./widgets.js";
 
 let timer = null;
 let slowTimer = null;
@@ -58,14 +58,21 @@ async function loadHistory() {
   }
 }
 
-// Las tarjetas de los módulos (registry.js): show al entrar, fast con cada tick y slow cada 30 s
-const each = (hook) => { for (const c of cards()) c[hook]?.(); };
+// Las tarjetas de los módulos (registry.js): show al entrar, fast con cada tick y slow cada 30 s. Las que están
+// ocultas en «Organizar» no piden nada (registry.js las pone al día al volver a sacarlas).
+const hidden = (id) => document.querySelector(`#st-grid > [data-w="${id}"]`)?.hidden;
+const each = async (pick) => {
+  await layoutReady;  // hasta entonces no se sabe cuáles están ocultas
+  for (const c of cards()) if (!c.box?.hidden) pick(c)?.();
+};
 
-function slowTick() {
-  loadHistory();
-  loadHealth();
+let slowAt = 0;
+function slowTick(entering = false) {
+  slowAt = Date.now();
+  layoutReady.then(() => { if (!hidden("history")) loadHistory(); if (!hidden("disks")) loadHealth(); });
   loadTailscale();
-  each("slow");
+  // al entrar, las que tienen show lo usan en vez de slow (si no, se pedía todo dos veces)
+  each((c) => (entering ? c.show ?? c.slow ?? c.fast : c.slow));
 }
 
 export function init() {
@@ -82,16 +89,22 @@ export function init() {
   initProcs();
   initDisks(() => { if (lastSystem) render(lastSystem); });
   initTailscale();
-  each("init");
+  for (const c of cards()) c.init?.();
+  // sacados de ocultos: que se pongan al día (los de los módulos, en registry.js)
+  const w = (id) => document.querySelector(`#st-grid > [data-w="${id}"]`);
+  w("history")?.addEventListener("wshow", loadHistory);
+  w("disks")?.addEventListener("wshow", () => loadHealth());
 }
 
 export function show() {
   if (timer) return;
   tick();
-  slowTick();
-  each("show");
-  timer = setInterval(() => { tick(); each("fast"); }, 5000);
-  slowTimer = setInterval(slowTick, 30000);
+  // Lo lento (historial, discos, Tailscale y el slow de las tarjetas) solo si hace más de 30 s: volver al panel
+  // desde otra app al momento no lo vuelve a pedir todo. El show de cada tarjeta sí, que es su «al entrar».
+  if (Date.now() - slowAt >= 30_000) slowTick(true);
+  else each((c) => c.show ?? c.fast);
+  timer = setInterval(() => { tick(); each((c) => c.fast); }, 5000);
+  slowTimer = setInterval(slowTick, 30_000);
 }
 
 export function hide() {
