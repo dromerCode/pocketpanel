@@ -1,16 +1,37 @@
 /* Terminal */
-.term { flex: 1; min-height: 0; position: relative; background: #0a0b0c; }
-.term-pane { position: absolute; inset: 6px 4px 0 6px; }
-.term .xterm { height: 100%; }
+.term {
+  flex: 1; min-height: 0; display: grid; grid-auto-rows: minmax(0, 1fr); gap: 4px; background: #0a0b0c;
+}
+.term.split { padding: 4px; }
+.term-pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; background: #0a0b0c; border-radius: 4px; }
+.term.split .term-pane { box-shadow: 0 0 0 1px var(--line); }
+.term.split .term-pane.focus { box-shadow: 0 0 0 1px var(--accent); }
+.term-host { position: absolute; inset: 6px 4px 0 6px; }
+.term-host .xterm { height: 100%; }
 .term-bar { gap: 6px; }
 .term-tabs { flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
 .term-tab { flex: none; display: flex; align-items: center; gap: 2px; max-width: 200px; padding: 0 2px 0 10px; height: 32px;
   border: 1px solid var(--line); border-radius: 8px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.term-tab.vis { color: var(--text); }
 .term-tab.on { background: var(--surface-2); color: var(--text); border-color: var(--accent); }
 .term-tab.dead .term-tab-name { text-decoration: line-through; opacity: .6; }
 .term-tab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
 .term-tab-x { width: 26px; height: 26px; padding: 0; border: 0; background: none; color: inherit; font-size: 16px; cursor: pointer; border-radius: 6px; }
 .term-tab-x:hover { background: var(--surface); }
+.icon-btn:disabled { opacity: .35; cursor: default; }
+
+/* Copiar y pegar: el texto de la sesión en un elemento normal, donde el móvil sí deja seleccionar con el dedo */
+.term-over { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; background: #0a0b0c; }
+.term-over-bar { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px; background: var(--surface);
+  border-bottom: 1px solid var(--line); }
+.term-over-bar .muted { flex: 1; min-width: 0; font-size: 12px; }
+.term-over pre, .term-over textarea {
+  flex: 1; min-height: 0; margin: 0; padding: 6px 4px 12px 6px; overflow: auto; border: 0; outline: 0; resize: none;
+  background: #0a0b0c; color: #ebe9e4; font: 13px/1.25 ui-monospace, "JetBrains Mono", Menlo, monospace;
+  white-space: pre-wrap; word-break: break-all; -webkit-user-select: text; user-select: text;
+}
+.term-over pre::selection { background: #3a4a2c; }
+
 .keys {
   flex: none; display: flex; gap: 6px; overflow-x: auto; padding: 6px 8px;
   background: var(--surface); border-top: 1px solid var(--line);
@@ -20,6 +41,7 @@
   background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
   font-family: var(--mono); font-size: 14px; cursor: pointer;
 }
+.keys button.act { font-family: inherit; font-size: 13px; }
 .keys button.on { background: var(--accent); color: var(--accent-ink); }
 @media (hover: hover) and (pointer: fine) {
   .keys { display: none; }

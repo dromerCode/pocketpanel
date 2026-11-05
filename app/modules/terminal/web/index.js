@@ -7,7 +7,7 @@ export default {
   scripts: ["vendor/xterm.js", "vendor/addon-fit.js"],
   view: { html: "view.html", tab: { icon: "›_", label: "Terminal", order: 10 } },
   tour: [{ sel: '.tabbar a[data-tab="terminal"]', title: "Terminal",
-    text: "Una shell en el servidor desde el móvil, con teclas extra (Esc, Ctrl, flechas…)." }],
+    text: "Una shell en el servidor desde el móvil, con teclas extra (Esc, Ctrl, flechas…), copiar y pegar, y varias a la vez en pantalla dividida." }],
   init: terminal.init,
   show: terminal.show,
 };
