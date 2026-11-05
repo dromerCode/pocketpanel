@@ -561,3 +561,55 @@ def test_old_data_gets_the_taxes_flag(st):
                        ' {"id": "b", "iva": 0, "irpf": 0, "invoice": null},'
                        ' {"id": "c", "iva": 0, "irpf": 0, "invoice": {"number": "1"}}]}')
     assert [c["taxes"] for c in st.load()["charges"]] == [True, False, True]
+
+
+# ---------- lo que se vio al probarlo entero ----------
+
+def test_control_characters_do_not_break_the_invoice_file():
+    from xml.dom import minidom
+    inv = {"number": "1", "date": "2026-11-04", "lines": [{"concept": "Web\x0bcon salto de Word\x01", "qty": 1, "price": 10}]}
+    z = zipfile.ZipFile(io.BytesIO(xlsx.fill(template(), inv, {"name": "A\x02na"}, 10, 21, 0)))
+    s = z.read("xl/worksheets/sheet1.xml").decode()
+    minidom.parseString(s)                                             # XML válido: Excel la abre
+    assert "Web\ncon salto de Word<" in s and ">Ana<" in s
+
+
+def test_unpaid_charges_are_not_pending_invoice(st):
+    d, _, c = base(st)
+    ch = st.upsert(d, "charges", {"client": c["id"], "concept": "Web", "base": 100}, T)
+    assert st.view(d, T)["summary"]["uninvoiced"] == 0                # su factura llegará sola al cobrarlo
+    st.pay(ch, {"amount": total(ch)}, T)
+    assert st.view(d, T)["summary"]["uninvoiced"] == 1                # cobrado sin pasar por auto_invoice
+    st.auto_invoice(d, ch)
+    assert st.view(d, T)["summary"]["uninvoiced"] == 0
+
+
+def test_unpay_checks_it_is_the_payment_on_screen(st):
+    d, _, c = base(st)
+    ch = st.upsert(d, "charges", {"client": c["id"], "concept": "Web", "base": 100}, T)
+    st.pay(ch, {"amount": 50, "date": "2026-11-01"}, T)
+    st.pay(ch, {"amount": 60, "date": "2026-11-02"}, T)
+    with pytest.raises(CobrosError, match="recarga"):                 # otra pestaña ya borró el primero
+        st.unpay(d, ch, 0, T, {"date": "2026-11-02", "amount": "50"})
+    with pytest.raises(CobrosError, match="recarga"):
+        st.unpay(d, ch, 0, T, {"date": "2026-11-01", "amount": "x"})
+    st.unpay(d, ch, 0, T, {"date": "2026-11-01", "amount": "50"})
+    assert [p["amount"] for p in ch["payments"]] == [60]
+
+
+def test_unpay_api_with_the_payment_shown(api):
+    cid = api.post("/api/cobros/clients", json={"name": "Ana"}).json()["saved"]
+    ch = api.post("/api/cobros/charges", json={"client": cid, "concept": "Soporte", "base": 100}).json()["saved"]
+    api.post(f"/api/cobros/charges/{ch}/pay", json={"amount": 10, "date": "2026-11-01"})
+    assert api.delete(f"/api/cobros/charges/{ch}/pay/0?date=2026-11-01&amount=11").status_code == 400
+    assert api.delete(f"/api/cobros/charges/{ch}/pay/0?date=2026-11-01&amount=10").status_code == 200
+
+
+def test_listing_survives_an_unwritable_invoice_folder(api, tmp_path):
+    cid = api.post("/api/cobros/clients", json={"name": "Ana"}).json()["saved"]
+    ch = api.post("/api/cobros/charges", json={"client": cid, "concept": "Soporte", "base": 10}).json()["saved"]
+    api.post(f"/api/cobros/charges/{ch}/invoice", json={"number": "1", "date": "2026-11-04", "lines": [{"concept": "x", "price": 10}]})
+    folder = tmp_path / "data" / "cobros"
+    (folder / "plantilla.xlsx").write_bytes(template())
+    (folder / "facturas").write_text("no soy una carpeta")              # no se puede guardar ahí
+    assert api.get("/api/cobros").status_code == 200

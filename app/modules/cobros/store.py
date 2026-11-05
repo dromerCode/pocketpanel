@@ -339,10 +339,19 @@ class Store:
             raise CobrosError(f"Solo queda por cobrar {left:.2f} €".replace(".", ","))
         c["payments"].append({"date": day(b.get("date") or today.isoformat()), "amount": amount, "method": method})
 
-    def unpay(self, d: dict, c: dict, i: int, today: date) -> None:
-        """Si deja de estar pagado, su factura automática (dice «Pagada») se va; volverá con su número al cobrar."""
+    def unpay(self, d: dict, c: dict, i: int, today: date, expect: dict | None = None) -> None:
+        """Si deja de estar pagado, su factura automática (dice «Pagada») se va; volverá con su número al cobrar.
+        `expect` ({date, amount}, el que se ve en pantalla): si en esa posición ya hay otro (otra pestaña), no se toca."""
         if not 0 <= i < len(c["payments"]):
-            raise CobrosError("Ese cobro no existe")
+            raise CobrosError("Ese cobro ya no existe: recarga")
+        p = c["payments"][i]
+        if expect:
+            try:
+                amount = round2(float(expect.get("amount")))
+            except (TypeError, ValueError, ArithmeticError):
+                amount = None
+            if (expect.get("date"), amount) != (p["date"], p["amount"]):
+                raise CobrosError("Ese cobro ha cambiado: recarga")
         c["payments"].pop(i)
         if (c["invoice"] or {}).get("auto") and round(total(c) - paid(c), 2) > 0:
             self.uninvoice(d, c, today, reusable=True)
@@ -481,8 +490,10 @@ class Store:
                             "pending": sum(1 for c in charges if c["state"] != "paid" and c["date"] <= today.isoformat()),
                             "late_n": sum(1 for c in charges if c["state"] == "late"),
                             "upcoming": sum(1 for c in charges if c["state"] != "paid" and c["date"] > today.isoformat()),
+                            # cobrado y sin factura (lo que se cobra del todo la tiene sola: esto es lo de antes,
+                            # o una que quitaste); lo que aún no te han pagado no cuenta, su factura llegará al cobrarlo
                             "uninvoiced": sum(1 for c in charges if c["client"] and c["taxes"] and not c["invoice"]
-                                              and c["date"] <= today.isoformat())}}
+                                              and c["state"] == "paid")}}
 
     def status(self, d: dict, charges: list[dict], today: date) -> tuple[dict, list[dict]]:
         """Cómo va cada suscripción y lo que te van a deber.
