@@ -76,6 +76,26 @@ def test_failed_request_is_shared_and_not_cached():
     asyncio.run(main())
 
 
+def test_request_survives_whoever_asked_leaving():
+    """Si se cierra la pantalla que lo pidió, la petición a Yahoo termina igual y queda guardada para la siguiente."""
+    async def main():
+        y = yahoo.Yahoo(session=object())
+        calls = 0
+
+        async def compute():
+            nonlocal calls
+            calls += 1
+            await asyncio.sleep(0.02)
+            return "ok"
+        t = asyncio.create_task(y.cached("k", 300, compute))
+        await asyncio.sleep(0.005)
+        t.cancel()
+        await asyncio.sleep(0.03)
+        assert t.cancelled() and not y._inflight
+        assert await y.cached("k", 300, compute) == "ok" and calls == 1
+    asyncio.run(main())
+
+
 def test_docker_stats_forget_removed_containers():
     async def main():
         d = DockerClient("/nonexistent.sock")

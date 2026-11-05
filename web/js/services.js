@@ -170,7 +170,16 @@ function flushLogs() {
   if (atBottom) pre.scrollTop = pre.scrollHeight;
 }
 
+/** Deja de recibir logs: sin avisos ni mensajes que aún estuvieran de camino. */
+function stopLogs() {
+  if (!logWs) return;
+  logWs.onmessage = logWs.onclose = null;
+  logWs.close();
+  logWs = null;
+}
+
 function openSheet(name) {
+  stopLogs();  // si había otra abierta (un enlace directo a otro servicio), que no se quede recibiendo
   open = name;
   paused = false;
   pending = "";
@@ -191,8 +200,7 @@ function openSheet(name) {
 function closeSheet() {
   open = null;
   $("sheet").hidden = true;
-  logWs?.close();
-  logWs = null;
+  stopLogs();
 }
 
 async function action(verb) {
@@ -259,7 +267,7 @@ export function hide() {
   timer = null;
   // con la pantalla bloqueada o en otra app, los logs dejan de llegar (el servidor deja de seguirlos); al volver,
   // se abren de nuevo con las últimas líneas
-  if (logWs) { logWs.onclose = null; logWs.close(); logWs = null; }
+  stopLogs();
 }
 
 export function leave() {

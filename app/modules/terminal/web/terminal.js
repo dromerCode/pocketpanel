@@ -48,6 +48,14 @@ function refit(s) {
 
 const refitAll = () => panes.forEach(refit);
 
+/** Suelta su WebSocket sin el aviso de «sesión cerrada» (se reconecta o se cierra la pestaña). */
+function hangUp(s) {
+  if (!s.ws) return;
+  s.ws.onclose = null;
+  s.ws.close();
+  s.ws = null;
+}
+
 function setCtrl(on) {
   ctrl = on;
   document.querySelector('#term-keys [data-k="ctrl"]').classList.toggle("on", on);
@@ -109,7 +117,7 @@ function layout(focus = true) {
 function focusPane(s) {
   if (s === active || !panes.includes(s)) return;
   active = s;
-  for (const x of panes) x.box.classList.toggle("focus", x === s);
+  arrange();
   renderTabs();
 }
 
@@ -124,8 +132,15 @@ function select(s) {
   layout();
 }
 
+/** Otra más a la vista, justo después de la que tiene el foco, y el foco pasa a ella. */
+function addPane(s) {
+  panes.splice(panes.indexOf(active) + 1, 0, s);
+  active = s;
+  layout();
+}
+
 function connect(s) {
-  if (s.ws) { s.ws.onclose = null; s.ws.close(); }
+  hangUp(s);
   s.term.reset();
   refit(s);
   s.size = `${s.term.cols}x${s.term.rows}`;  // va en la URL
@@ -199,11 +214,8 @@ export function open(mode = "shell", sid = null, split = false) {
   box.addEventListener("pointerdown", () => focusPane(s));
   box.addEventListener("focusin", () => focusPane(s));
   sessions.push(s);
-  if (split && panes.length) {
-    panes.splice(panes.indexOf(active) + 1, 0, s);
-    active = s;
-    layout();
-  } else select(s);
+  if (split && panes.length) addPane(s);
+  else select(s);
   connect(s);
 }
 
@@ -212,15 +224,12 @@ function split() {
   if (sessions.length < MAX) return open("shell", null, true);
   // sin sitio para otra sesión: se enseña una de las que ya hay
   const idle = sessions.find((s) => !panes.includes(s));
-  if (!idle) return;
-  panes.splice(panes.indexOf(active) + 1, 0, idle);
-  active = idle;
-  layout();
+  if (idle) addPane(idle);
 }
 
 function close(s) {
   closeOver(s, false);
-  if (s.ws) { s.ws.onclose = null; s.ws.close(); }
+  hangUp(s);
   s.term.dispose();
   s.box.remove();
   const i = sessions.indexOf(s);
@@ -318,7 +327,8 @@ async function paste(s) {
 }
 
 export function init() {
-  new ResizeObserver(() => { arrange(); buttons(); refitAll(); }).observe($("term"));
+  // al estrecharse (el móvil a vertical) pueden sobrar paneles: layout también repinta las pestañas
+  new ResizeObserver(() => layout(false)).observe($("term"));
   $("term-new").onclick = () => open();
   $("term-split").onclick = split;
   $("term-join").onclick = () => { panes = [active]; layout(); };

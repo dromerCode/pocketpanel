@@ -47,7 +47,7 @@ function render(p) {
   }
   $("pkg-log").hidden = !failed || !!doing;
   $("pkg-log").onclick = () => watch();
-  if (doing && !follow) follow = setTimeout(poll, EVERY);
+  if (doing && !follow) follow = setTimeout(poll, document.hidden ? EVERY * 5 : EVERY);  // bloqueado, sin prisa
 }
 
 export async function loadPackages(fresh = false) {

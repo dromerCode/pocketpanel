@@ -58,21 +58,25 @@ async function loadHistory() {
   }
 }
 
-// Las tarjetas de los módulos (registry.js): show al entrar, fast con cada tick y slow cada 30 s. Las que están
-// ocultas en «Organizar» no piden nada (registry.js las pone al día al volver a sacarlas).
-const hidden = (id) => document.querySelector(`#st-grid > [data-w="${id}"]`)?.hidden;
+// Lo que se oculta en «Organizar» no pide nada; al volver a sacarlo, se pone al día (evento wshow, widgets.js).
+// Lo lento del propio Estado, por widget (Tailscale lo mira él mismo, en tailscale.js):
+const widget = (id) => document.querySelector(`#st-grid > [data-w="${id}"]`);
+const SLOW = { history: () => loadHistory(), disks: () => loadHealth() };
+
+// Las tarjetas de los módulos (registry.js): show al entrar, fast con cada tick y slow cada 30 s
 const each = async (pick) => {
   await layoutReady;  // hasta entonces no se sabe cuáles están ocultas
   for (const c of cards()) if (!c.box?.hidden) pick(c)?.();
 };
 
 let slowAt = 0;
-function slowTick(entering = false) {
+async function slowTick(entering = false) {
   slowAt = Date.now();
-  layoutReady.then(() => { if (!hidden("history")) loadHistory(); if (!hidden("disks")) loadHealth(); });
   loadTailscale();
   // al entrar, las que tienen show lo usan en vez de slow (si no, se pedía todo dos veces)
   each((c) => (entering ? c.show ?? c.slow ?? c.fast : c.slow));
+  await layoutReady;
+  for (const [id, load] of Object.entries(SLOW)) if (!widget(id)?.hidden) load();
 }
 
 export function init() {
@@ -90,10 +94,7 @@ export function init() {
   initDisks(() => { if (lastSystem) render(lastSystem); });
   initTailscale();
   for (const c of cards()) c.init?.();
-  // sacados de ocultos: que se pongan al día (los de los módulos, en registry.js)
-  const w = (id) => document.querySelector(`#st-grid > [data-w="${id}"]`);
-  w("history")?.addEventListener("wshow", loadHistory);
-  w("disks")?.addEventListener("wshow", () => loadHealth());
+  for (const [id, load] of Object.entries(SLOW)) widget(id)?.addEventListener("wshow", load);  // (módulos: registry.js)
 }
 
 export function show() {
@@ -104,7 +105,7 @@ export function show() {
   if (Date.now() - slowAt >= 30_000) slowTick(true);
   else each((c) => c.show ?? c.fast);
   timer = setInterval(() => { tick(); each((c) => c.fast); }, 5000);
-  slowTimer = setInterval(slowTick, 30_000);
+  slowTimer = setInterval(() => slowTick(), 30_000);
 }
 
 export function hide() {

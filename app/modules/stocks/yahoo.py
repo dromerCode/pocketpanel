@@ -69,36 +69,30 @@ class Yahoo:
         self.crumb: str | None = None
         self._crumb_lock = asyncio.Lock()
         self._cache: dict[str, tuple[float, object]] = {}
-        self._inflight: dict[str, asyncio.Future] = {}
+        self._inflight: dict[str, asyncio.Task] = {}
 
     async def cached(self, key: str, ttl: float, compute):
         """Lo guardado si tiene menos de `ttl` s. Si ya se está pidiendo (dos pantallas, o el widget y la vista a la
-        vez), se espera a esa misma respuesta en vez de volver a preguntar a Yahoo."""
-        now = time.time()
+        vez), se espera a esa misma petición en vez de volver a preguntar a Yahoo. La petición es una tarea aparte: si
+        quien la pidió se va, termina igual y queda guardada para la siguiente."""
         hit = self._cache.get(key)
-        if hit and now - hit[0] < ttl:
+        if hit and time.time() - hit[0] < ttl:
             return hit[1]
-        while key in self._inflight:
-            f = self._inflight[key]
-            await asyncio.wait({f})  # sin cancelarla aunque esta petición se vaya
-            if not f.cancelled():
-                return f.result()
-        fut = self._inflight[key] = asyncio.get_running_loop().create_future()
+        task = self._inflight.get(key)
+        if task is None:
+            task = self._inflight[key] = asyncio.create_task(self._fetch(key, compute))
+            task.add_done_callback(lambda t: t.cancelled() or t.exception())  # sin «exception never retrieved»
+        return await asyncio.shield(task)
+
+    async def _fetch(self, key: str, compute):
         try:
             value = await compute()
-        except asyncio.CancelledError:  # quien la pidió se fue: los que esperaban, que pregunten ellos
-            fut.cancel()
-            raise
-        except Exception as e:
-            fut.set_exception(e)
-            fut.exception()  # que no avise de «excepción sin recoger» si nadie más la esperaba
-            raise
         finally:
             del self._inflight[key]
-        fut.set_result(value)
-        if len(self._cache) > 500:  # lo caducado hace más de un día ya no sirve (valores que ya no miras…)
+        now = time.time()
+        if len(self._cache) > 500:  # lo guardado hace más de un día ya no sirve (valores que ya no miras…)
             self._cache = {k: v for k, v in self._cache.items() if now - v[0] < 86400}
-        self._cache[key] = (time.time(), value)
+        self._cache[key] = (now, value)
         return value
 
     async def _get(self, url: str, params: dict) -> dict:
