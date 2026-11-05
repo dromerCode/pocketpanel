@@ -457,8 +457,11 @@ function openCharge(id) {
       el("button", { class: "x", type: "button", title: "Borrar este cobro", onclick: async (e) => {
         const undo = inv?.auto && round2(c.left + p.amount) > 0;  // deja de estar pagado: su factura automática se va
         if (!confirm(`¿Borrar el cobro de ${eur(p.amount)} del ${fd(p.date)}?${undo ? ` Se quitará también la factura ${inv.number}; recuperará ese número cuando vuelva a estar pagado. Si ya la enviaste, haz una rectificativa.` : ""}`)) return;
-        e.currentTarget.disabled = true;  // va por posición: un doble toque borraría también el siguiente cobro
-        if (await call(`/charges/${id}/pay/${i}?date=${p.date}&amount=${p.amount}`, "DELETE")) openCharge(id);
+        const x = e.currentTarget;
+        x.disabled = true;  // va por posición: un doble toque borraría también el siguiente cobro
+        const q = new URLSearchParams({ date: p.date, amount: p.amount });
+        if (await call(`/charges/${id}/pay/${i}?${q}`, "DELETE")) openCharge(id);
+        else x.disabled = false;
       } }, "✕"))))] : null,
     ...pay, ...invoice,
     el("div", { class: "btn-row" },

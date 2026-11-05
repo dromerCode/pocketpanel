@@ -1,10 +1,14 @@
 import asyncio
+import contextlib
 import json
+import logging
 import shlex
 
 from fastapi import WebSocket, WebSocketDisconnect
 
 from ...core import UUID_RE
+
+log = logging.getLogger(__name__)
 
 
 # Sin esto, tmux y Claude pintan los acentos como "_" (la sesión SSH no trae locale)
@@ -31,16 +35,16 @@ async def bridge(ws: WebSocket, ssh, cmd: str, cols: int, rows: int) -> None:
 
     async def pump_out():
         try:
-            while True:
-                data = await proc.stdout.read(65536)
-                if not data:
-                    break
+            while data := await proc.stdout.read(65536):
                 await ws.send_bytes(data)
-        finally:
-            try:
-                await ws.close()
-            except RuntimeError:
-                pass
+        except (WebSocketDisconnect, RuntimeError):
+            return  # el navegador ya se fue: no hay a quién avisar
+        except Exception as e:  # noqa: BLE001 — la conexión SSH se cayó: se avisa cerrando
+            log.info("terminal: %s", e)
+        # La shell terminó (exit): el navegador lo ve como sesión cerrada. Si a quien se ha cancelado es a esta tarea
+        # (el navegador se fue), no se llega aquí y no queda «Task exception was never retrieved» en el registro.
+        with contextlib.suppress(WebSocketDisconnect, RuntimeError):
+            await ws.close()
 
     out = asyncio.create_task(pump_out())
     try:

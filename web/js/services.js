@@ -235,6 +235,7 @@ export function init() {
   $("sh-pause").onclick = () => {
     paused = !paused;
     $("sh-pause").textContent = paused ? "Seguir" : "Pausar";
+    if (!paused && !logWs && open) return openSheet(open);  // se cerraron al salir de la app estando en pausa
     flushLogs();
   };
 }
@@ -245,7 +246,8 @@ export function show(args = []) {
     const name = decodeURIComponent(args[1]);
     (items.length ? Promise.resolve() : load()).then(() => { if (items.some((x) => x.name === name)) openSheet(name); });
   }
-  if (open && !logWs && !$("sheet").hidden) openSheet(open);
+  // en pausa se deja lo que estabas leyendo; al darle a Seguir se vuelven a pedir
+  if (open && !logWs && !paused && !$("sheet").hidden) openSheet(open);
   if (timer) return;
   load();
   for (const fn of showHooks) fn();
