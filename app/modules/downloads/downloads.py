@@ -145,7 +145,7 @@ class DownloadsWatcher:
 
     async def tick(self, n: int, now: float) -> list:
         notes = []
-        if self.qbit and n % 2 == 0:  # cada minuto
+        if self.qbit and self.notify_finished and n % 2 == 0:  # cada minuto (solo sirve para avisar)
             try:
                 ts = await self.qbit.torrents()
             except DownloadsError:
