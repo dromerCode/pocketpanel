@@ -10,6 +10,8 @@ let follow = null;     // ese temporizador
 let doing = null;      // lo que está en marcha: "check", "upgrade" o null
 let followed = null;   // lo que se está siguiendo, para el aviso del final (doing ya puede estar a null)
 let failed = false;    // la última terminó mal: botón para ver por qué
+const HELD = "Ubuntu suelta algunas actualizaciones a los equipos poco a poco (phasing): apt upgrade no las instala "
+  + "hasta que le toca a este, normalmente en unos días. No hay que hacer nada.";
 
 function render(p) {
   doing = p.running ? p.doing || "upgrade" : null;
@@ -19,15 +21,16 @@ function render(p) {
   badge.className = `badge ${p.running ? "" : p.reboot || p.security ? "warn" : p.count ? "" : "ok"}`;
   $("pkg-sum").replaceChildren(...[
     el("span", {}, p.count ? `${p.count} por actualizar${p.security ? ` · ${p.security} de seguridad` : ""}` : "Todo al día"),
+    p.held ? el("span", { class: "muted small", title: HELD }, `${p.held} en espera (Ubuntu los suelta poco a poco)`) : null,
     el("span", { class: "muted small" }, p.checked_at ? `comprobado ${fmtAgo(p.checked_at)}` : ""),
     p.reboot ? el("span", { class: "pkg-reboot" },
       `⟳ Hace falta reiniciar${p.reboot_pkgs.length ? ` (${p.reboot_pkgs.slice(0, 3).join(", ")})` : ""}`) : null,
   ].filter(Boolean));
-  const list = p.count ? el("details", { class: "pkg-list", open: openList || null, ontoggle: (e) => { openList = e.target.open; } },
+  const list = p.packages.length ? el("details", { class: "pkg-list", open: openList || null, ontoggle: (e) => { openList = e.target.open; } },
     el("summary", {}, "Ver paquetes"),
-    el("ul", {}, p.packages.map((x) => el("li", {},
+    el("ul", {}, p.packages.map((x) => el("li", { class: x.held ? "pkg-held" : "", title: x.held ? HELD : null },
       el("span", { class: x.security ? "pkg-sec" : "" }, x.name),
-      el("span", { class: "pkg-ver mono", title: `${x.from} → ${x.to}` }, x.to))))) : null;
+      el("span", { class: "pkg-ver mono", title: `${x.from} → ${x.to}` }, x.held ? "en espera" : x.to))))) : null;
   $("pkg-list").replaceChildren(...(list ? [list] : []));
   // En marcha, el botón de lo que se está haciendo dice «Buscando…» / «Actualizando…» y tocarlo abre la ventana
   const up = $("pkg-up"), check = $("pkg-check");

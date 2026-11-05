@@ -1,8 +1,12 @@
 """Los paquetes del sistema por actualizar (apt) y la actualización.
 
 La lista sale de `apt list --upgradable`, que no necesita root y lee lo que bajó el último `apt update` (Ubuntu y
-Debian lo hacen solos cada día). Actualizar es `sudo apt update` + `sudo apt upgrade -y`, justo esas órdenes, para
-que baste con permitir esas dos en sudoers.
+Debian lo hacen solos cada día). No todo lo de esa lista lo instala `apt upgrade`: Ubuntu suelta algunas versiones a
+los equipos poco a poco («phasing») y hasta que le toca a este las deja quietas. Para saber cuáles sí, se simula la
+actualización (`apt -s upgrade`, tampoco necesita root); las demás salen como «en espera» y no cuentan.
+
+Actualizar es `sudo apt update` + `sudo apt upgrade -y`, justo esas órdenes, para que baste con permitir esas dos en
+sudoers.
 
 La actualización corre en el host desacoplada del panel (setsid + nohup) y escribe en un registro: si apt actualiza
 Docker, el contenedor del panel se reinicia y su conexión SSH se corta, y eso no puede cortar a dpkg a medias. El
@@ -16,6 +20,7 @@ FRESH = 300  # s: la lista se relee como mucho cada 5 min (o al acabar una actua
 LIST_SCRIPT = r"""
 echo @list; LC_ALL=C apt list --upgradable 2>/dev/null
 echo @stamp; stat -c %Y /var/lib/apt/periodic/update-success-stamp 2>/dev/null || stat -c %Y /var/cache/apt/pkgcache.bin
+sim=$(LC_ALL=C apt -s upgrade 2>/dev/null) && { echo @inst; printf '%s\n' "$sim" | sed -n 's/^Inst \([^ :]*\).*/\1/p'; }
 echo @reboot; [ -e /var/run/reboot-required ] && { echo yes; cat /var/run/reboot-required.pkgs 2>/dev/null; }
 true
 """
@@ -39,9 +44,15 @@ def parse_list(out: str) -> dict:
         if m := LINE_RE.match(line):
             name, suites, new, _arch, old = m.groups()
             pkgs.append({"name": name, "from": old, "to": new, "security": "-security" in suites})
+    inst = set(secs["inst"]) if "inst" in secs else None  # sin simulación (falló), todo cuenta como pendiente
+    for p in pkgs:
+        p["held"] = inst is not None and p["name"] not in inst
+    held = [p for p in pkgs if p["held"]]
+    pkgs = [p for p in pkgs if not p["held"]] + held  # las que se instalarán, primero
     stamp = secs.get("stamp", [])
     reboot = secs.get("reboot", [])
-    return {"packages": pkgs, "count": len(pkgs), "security": sum(p["security"] for p in pkgs),
+    return {"packages": pkgs, "count": len(pkgs) - len(held), "held": len(held),
+            "security": sum(p["security"] and not p["held"] for p in pkgs),
             "checked_at": int(stamp[0]) if stamp and stamp[0].isdigit() else None,
             "reboot": bool(reboot), "reboot_pkgs": reboot[1:]}
 

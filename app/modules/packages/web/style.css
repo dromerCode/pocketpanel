@@ -10,3 +10,4 @@
 .pkg-btns { display: flex; gap: 8px; margin-top: auto; }
 .pkg-btns .busy { animation: pkg-busy 1.4s ease-in-out infinite; }
 @keyframes pkg-busy { 50% { opacity: .6; } }
+.pkg-held { opacity: .55; }
