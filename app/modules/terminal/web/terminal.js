@@ -296,9 +296,9 @@ function showCopy(s) {
     await copyOut(t);
     closeOver(s);
   };
-  s.onSel = () => { btn.textContent = picked() ? "Copiar selección" : "Copiar todo"; };
   s.term.blur();
-  overlay(s, "Mantén pulsado para seleccionar", pre, btn);
+  overlay(s, "Mantén pulsado para seleccionar", pre, btn);  // cierra la que hubiera, con su s.onSel
+  s.onSel = () => { btn.textContent = picked() ? "Copiar selección" : "Copiar todo"; };
   document.addEventListener("selectionchange", s.onSel);
   // Al mismo sitio que se estaba viendo (abajo del todo, o donde se hubiera subido)
   const b = s.term.buffer.active;
