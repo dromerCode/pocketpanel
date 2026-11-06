@@ -137,3 +137,23 @@ async def test_keeps_the_latest_per_topic(tmp_path, monkeypatch):
     await nt.add("b")
     await nt.poll()
     assert [m["id"] for m in nt.view()["messages"]] == ["9", "8", "7", "b1"]
+
+
+def test_parse_survives_odd_fields():
+    """Un mensaje raro de un servidor ajeno no tira la lectura de todos los demás."""
+    a, b = parse("\n".join([line("1", "ayer", tags=5), line("2", 6)]))
+    assert (a["id"], a["time"], a["tags"]) == ("1", 0, [])
+    assert b["id"] == "2"
+
+
+async def test_new_topic_doesnt_report_old_messages_already_trimmed(tmp_path, monkeypatch):
+    """Al suscribirse a otro tema se pide «all»: lo viejo que ya se recortó de los demás no es nuevo."""
+    monkeypatch.setattr("app.modules.ntfy.ntfy.KEEP", 3)
+    fake, clock = Fake([line(str(i), i, "a") for i in range(10)]), [1000]
+    nt = make(tmp_path, fake, clock)
+    await nt.add("a")
+    await nt.poll()
+    await nt.add("b")
+    clock[0] = 1010
+    assert await nt.poll() == []
+    assert [m["id"] for m in nt.view()["messages"]] == ["9", "8", "7"]

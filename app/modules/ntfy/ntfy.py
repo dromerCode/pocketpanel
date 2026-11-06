@@ -35,6 +35,13 @@ def _link(v) -> str:
     return v if v.startswith(URL) else ""
 
 
+def _int(v, default: int) -> int:
+    try:
+        return int(v or default)
+    except (TypeError, ValueError):
+        return default
+
+
 def parse(text: str) -> list[dict]:
     """Los mensajes de una respuesta de ntfy (un JSON por línea); lo que no es un mensaje (open, keepalive…) se ignora."""
     out = []
@@ -46,14 +53,12 @@ def parse(text: str) -> list[dict]:
         if not isinstance(m, dict) or m.get("event") != "message" or not m.get("id"):
             continue
         att = m.get("attachment") if isinstance(m.get("attachment"), dict) else {}
-        try:
-            prio = int(m.get("priority") or 3)
-        except (TypeError, ValueError):
-            prio = 3
+        tags = m.get("tags") if isinstance(m.get("tags"), list) else []
         out.append({
-            "id": str(m["id"]), "time": int(m.get("time") or 0), "topic": str(m.get("topic") or ""),
-            "title": str(m.get("title") or ""), "message": str(m.get("message") or ""), "priority": prio,
-            "tags": [str(t) for t in m.get("tags") or [] if isinstance(t, str)],
+            "id": str(m["id"]), "time": _int(m.get("time"), 0), "topic": str(m.get("topic") or ""),
+            "title": str(m.get("title") or ""), "message": str(m.get("message") or ""),
+            "priority": _int(m.get("priority"), 3),
+            "tags": [t for t in tags if isinstance(t, str)],
             "click": _link(m.get("click")),
             "attachment": {"name": str(att.get("name") or "adjunto"), "url": _link(att.get("url"))}
             if _link(att.get("url")) else None,
@@ -151,12 +156,14 @@ class Ntfy:
             self.error = None
             seen = {m["id"] for m in self.messages}
             new = [m for m in parse(r.text) if m["id"] not in seen and m["topic"] in topics]
+            # con «all» (un tema nuevo) también vuelve lo viejo de los demás que ya se recortó: tampoco es nuevo
+            fresh = [m for m in new if m["topic"] not in first and m["time"] >= self.since[m["topic"]] - MARGIN]
             for t in topics:
                 self.since[t] = int(start)
             if new:
                 self.messages = self._trim(self.messages + new)
             self._save()
-            return sorted((m for m in new if m["topic"] not in first), key=lambda m: m["time"])
+            return sorted(fresh, key=lambda m: m["time"])
 
     @staticmethod
     def _trim(msgs: list[dict]) -> list[dict]:
