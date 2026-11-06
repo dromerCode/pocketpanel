@@ -64,6 +64,11 @@ modules:
     interval: 5                # minutos entre comprobaciones
     cert_warn_days: 14
 
+  ntfy:                        # mensajes de temas de ntfy en Estado (los temas se añaden desde el widget)
+    enabled: false
+    server: https://ntfy.sh    # o el tuyo; el token, si hace falta, desde la app (se guarda en data/)
+    notify: false              # aviso push de cada mensaje nuevo (mira cada 30 s en vez de cada 10 min)
+
   downloads:                   # qBittorrent, Sonarr y Radarr (claves/contraseñas desde la app: se guardan en data/)
     enabled: false
     qbittorrent_url: ""        # http://127.0.0.1:8080

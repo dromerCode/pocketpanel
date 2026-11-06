@@ -20,6 +20,7 @@ modules:
   files: {enabled: true}
   packages: {enabled: true}
   cobros: {enabled: true}
+  ntfy: {enabled: true}
 """
 NONE = """
 name: casa-ramon
