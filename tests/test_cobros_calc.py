@@ -10,7 +10,18 @@ ROOT = Path(__file__).parent.parent
 TESTS = r"""
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { monthText, num, pct, round2, totalOf } from "./calc.js";
+import { heldNumber, monthText, num, pct, round2, totalOf } from "./calc.js";
+
+test("heldNumber: el número reservado de ese cargo, solo si es de este año (como auto_invoice)", () => {
+  const annulled = [
+    { number: "2026-003", charge: "a", reusable: false },
+    { number: "2025-009", charge: "b", reusable: true },
+    { number: "2026-004", charge: "c", reusable: true },
+  ];
+  assert.equal(heldNumber(annulled, "c", "2026-11-06"), "2026-004");
+  assert.equal(heldNumber(annulled, "a", "2026-11-06"), undefined);  // anulado de verdad: no se vuelve a ofrecer
+  assert.equal(heldNumber(annulled, "b", "2026-11-06"), undefined);  // de otro año: no iría en orden
+});
 
 test("num entiende los miles a la española", () => {
   assert.equal(num("1.234"), 1234);

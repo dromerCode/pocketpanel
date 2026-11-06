@@ -67,6 +67,12 @@ def _sheets(z: zipfile.ZipFile) -> dict[str, str]:
     return out
 
 
+def _xml(v: str) -> str:
+    """Texto para el XML de la hoja: escapado y sin los caracteres de control que XML no admite (un salto de línea
+    pegado desde Word, \x0b, rompería el archivo: Excel diría que está dañado)."""
+    return escape(re.sub(r"[\x0b\x0c]", "\n", re.sub(r"[\x00-\x08\x0e-\x1f\ufffe\uffff]", "", v)))
+
+
 def _cell_re(ref: str):
     return re.compile(rf'<c r="{ref}"(?P<attrs>[^>]*?)(?:/>|>(?P<body>.*?)</c>)', re.S)
 
@@ -91,7 +97,7 @@ class _Sheet:
     def text(self, ref, value: str):
         m = self._find(ref)
         if value:
-            self._put(m, ref, f'<is><t xml:space="preserve">{escape(value)}</t></is>', "inlineStr")
+            self._put(m, ref, f'<is><t xml:space="preserve">{_xml(value)}</t></is>', "inlineStr")
         else:
             self._put(m, ref, "")
 
@@ -105,7 +111,7 @@ class _Sheet:
         f = re.search(r"<f[^>]*?(?:/>|>.*?</f>)", m.group("body") or "", re.S)
         f = f.group(0) if f else ""
         if isinstance(value, str):
-            self._put(m, ref, f"{f}<v>{escape(value)}</v>", "str")
+            self._put(m, ref, f"{f}<v>{_xml(value)}</v>", "str")
         else:
             self._put(m, ref, f"{f}<v>{_num(value)}</v>", "n")
 

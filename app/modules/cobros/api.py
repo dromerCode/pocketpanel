@@ -2,7 +2,7 @@ import logging
 from datetime import date, datetime
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 
 from ... import auth
@@ -103,7 +103,7 @@ def setup(ctx) -> APIRouter:
         if store.template.is_file():
             try:  # las facturas que aún no estén en la carpeta (hechas antes de tener plantilla, o borradas a mano)
                 changed |= bool(store.write_missing(d))
-            except TemplateError as e:
+            except (TemplateError, OSError) as e:  # que no deje sin ver los cobros
                 log.warning("cobros: no se pudieron guardar facturas: %s", e)
         if changed:
             store.save(d)
@@ -133,8 +133,9 @@ def setup(ctx) -> APIRouter:
         return change(collect)
 
     @r.delete("/charges/{id_}/pay/{i}")
-    async def unpay(id_: str, i: int):
-        return change(lambda d: store.unpay(d, store.charge(d, id_), i, today()))
+    async def unpay(id_: str, i: int, on: str | None = Query(None, alias="date"), amount: str | None = None):
+        expect = {"date": on, "amount": amount} if on and amount else None  # el cobro que se ve en pantalla
+        return change(lambda d: store.unpay(d, store.charge(d, id_), i, today(), expect))
 
     @r.post("/charges/{id_}/invoice")
     async def invoice(id_: str, request: Request):
@@ -195,7 +196,7 @@ def setup(ctx) -> APIRouter:
         try:
             if store.write_missing(d):  # las facturas hechas antes de tener plantilla
                 store.save(d)
-        except TemplateError as e:
+        except (TemplateError, OSError) as e:
             log.warning("cobros: no se pudieron guardar las facturas pendientes: %s", e)
         return {"ok": True}
 

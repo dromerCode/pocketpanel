@@ -7,29 +7,92 @@ import time
 
 Q = "https://query2.finance.yahoo.com"
 TTL = 300  # los precios se refrescan cada 5 min: no hace falta más y Yahoo lo agradece
+IDLE = 60  # s sin pedir nada a Yahoo: se cierra la conexión (ver IdleSession)
 
 
 class YahooError(Exception):
     pass
 
 
+class IdleSession:
+    """La sesión de curl_cffi, abierta solo mientras se usa.
+
+    Mientras está abierta, curl_cffi despierta el panel 10 veces por segundo (un temporizador suyo que no para nunca),
+    y con la Bolsa activa eso era casi todo lo que gastaba el panel en reposo. Así se abre al pedir algo y se cierra
+    al minuto sin uso; las cookies (y con ellas el «crumb» de Yahoo) pasan a la siguiente."""
+
+    def __init__(self, factory):
+        self.factory = factory
+        self.s, self.cookies, self.busy, self.timer = None, None, 0, None
+        self._closing: set = set()
+
+    async def get(self, *args, **kwargs):
+        if self.timer:
+            self.timer.cancel()
+            self.timer = None
+        if self.s is None:
+            self.s = self.factory(**({"cookies": self.cookies} if self.cookies else {}))
+        self.busy += 1
+        try:
+            return await self.s.get(*args, **kwargs)
+        finally:
+            self.busy -= 1
+            if not self.busy and self.s is not None:
+                self.timer = asyncio.get_running_loop().call_later(IDLE, self._expire)
+
+    def _expire(self) -> None:
+        self.timer = None
+        if self.busy or self.s is None:
+            return
+        s, self.s = self.s, None
+        self.cookies = s.cookies
+        t = asyncio.get_running_loop().create_task(s.close())
+        self._closing.add(t)
+        t.add_done_callback(self._closing.discard)
+
+    async def close(self) -> None:
+        if self.timer:
+            self.timer.cancel()
+            self.timer = None
+        if self.s is not None:
+            s, self.s = self.s, None
+            await s.close()
+
+
 class Yahoo:
     def __init__(self, session=None, parallel: int = 4):
         if session is None:
             from curl_cffi.requests import AsyncSession  # dependencia del módulo (requirements.txt), no del núcleo
-            session = AsyncSession(impersonate="chrome", timeout=20)
+            session = IdleSession(lambda **kw: AsyncSession(impersonate="chrome", timeout=20, **kw))
         self.s = session
         self.sem = asyncio.Semaphore(parallel)
         self.crumb: str | None = None
         self._crumb_lock = asyncio.Lock()
         self._cache: dict[str, tuple[float, object]] = {}
+        self._inflight: dict[str, asyncio.Task] = {}
 
     async def cached(self, key: str, ttl: float, compute):
+        """Lo guardado si tiene menos de `ttl` s. Si ya se está pidiendo (dos pantallas, o el widget y la vista a la
+        vez), se espera a esa misma petición en vez de volver a preguntar a Yahoo. La petición es una tarea aparte: si
+        quien la pidió se va, termina igual y queda guardada para la siguiente."""
         hit = self._cache.get(key)
         if hit and time.time() - hit[0] < ttl:
             return hit[1]
-        value = await compute()
-        self._cache[key] = (time.time(), value)
+        task = self._inflight.get(key)
+        if task is None:
+            task = self._inflight[key] = asyncio.create_task(self._fetch(key, compute))
+            task.add_done_callback(lambda t: t.cancelled() or t.exception())  # sin «exception never retrieved»
+        return await asyncio.shield(task)
+
+    async def _fetch(self, key: str, compute):
+        try:
+            value = await compute()
+        finally:
+            del self._inflight[key]
+        now = time.time()
+        if len(self._cache) > 500:  # lo guardado hace más de un día ya no sirve (valores que ya no miras…)
+            self._cache = {k: v for k, v in self._cache.items() if now - v[0] < 86400}
+        self._cache[key] = (now, value)
         return value
 
     async def _get(self, url: str, params: dict) -> dict:

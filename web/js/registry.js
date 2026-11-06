@@ -108,6 +108,8 @@ function mount(m) {
     box.dataset.size = c.size ?? SLOT_SIZE[slot];
     box.dataset.rank = SLOT_RANK[slot] + Number(c.order ?? m.order) / 1000;
     if (html.cards[i]) box.append(html.cards[i]);
+    c.box = box;  // oculta en «Organizar», Estado no le pide nada; al volver a sacarla, se pone al día
+    box.addEventListener("wshow", () => (c.show ?? c.slow ?? c.fast)?.());
     box.dataset.title = c.title || box.querySelector(".section-title")?.textContent.trim() || m.name;
     const after = [...grid.children].find((x) => Number(x.dataset.rank) > Number(box.dataset.rank));
     grid.insertBefore(box, after || null);

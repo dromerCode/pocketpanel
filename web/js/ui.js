@@ -58,7 +58,10 @@ export function runnerOut(text, append = false) {
 export function watchJob(url, title, results, ondone) {
   let timer = null;
   openRunner(title, "en marcha… (puedes cerrar esto, sigue en el servidor)", () => clearInterval(timer));
+  let first = true;
   const poll = async () => {
+    if (document.hidden && !first) return;  // con la pantalla bloqueada no pregunta; al volver, en el siguiente tick
+    first = false;
     try {
       const j = await api(url);
       runnerOut(j.lines.join("\n"));

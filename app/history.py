@@ -6,6 +6,13 @@ class HistoryDB:
 
     def __init__(self, path: str):
         self.db = sqlite3.connect(path, check_same_thread=False)
+        # Una muestra cada 30 s: con WAL y synchronous=NORMAL no se fuerza la escritura al disco en cada una (solo al
+        # pasar el WAL a la base); un corte de luz como mucho pierde las últimas muestras de la gráfica.
+        try:
+            self.db.execute("PRAGMA journal_mode=WAL")
+            self.db.execute("PRAGMA synchronous=NORMAL")
+        except sqlite3.DatabaseError:
+            pass  # p. ej. en un sistema de archivos sin memoria compartida: sigue como antes
         self.db.execute("CREATE TABLE IF NOT EXISTS s (ts INTEGER PRIMARY KEY, cpu REAL, mem REAL, temp REAL)")
         self.db.commit()
 

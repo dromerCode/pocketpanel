@@ -142,3 +142,13 @@ def test_downloads_summary(tmp_path):
 
     c.app.state.ctx.downloads_qbit = Q()
     assert c.get("/api/downloads/summary").json() == {"active": 1, "paused": 1, "dl": 10, "up": 5, "error": None}
+
+
+def test_ntfy_api(tmp_path):
+    c, _, _ = make(tmp_path, "modules:\n  ntfy: {enabled: true, server: 'http://127.0.0.1:9'}\n")
+    assert c.get("/api/ntfy").json() == {"server": "http://127.0.0.1:9", "topics": [], "messages": [], "error": None,
+                                         "checked": None}
+    assert c.post("/api/ntfy/topics", json={"topic": "con espacio"}).status_code == 400
+    r = c.post("/api/ntfy/topics", json={"topic": "http://127.0.0.1:9/mi-tema"}).json()
+    assert r["topics"] == ["mi-tema"] and r["error"].startswith("no se pudo hablar")
+    assert c.delete("/api/ntfy/topics/mi-tema").json()["topics"] == []

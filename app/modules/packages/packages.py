@@ -1,8 +1,14 @@
 """Los paquetes del sistema por actualizar (apt) y la actualización.
 
 La lista sale de `apt list --upgradable`, que no necesita root y lee lo que bajó el último `apt update` (Ubuntu y
-Debian lo hacen solos cada día). Actualizar es `sudo apt update` + `sudo apt upgrade -y`, justo esas órdenes, para
-que baste con permitir esas dos en sudoers.
+Debian lo hacen solos cada día). No todo lo de esa lista lo instala `apt upgrade`: Ubuntu suelta algunas versiones a
+los equipos poco a poco («phasing») y hasta que le toca a este las deja quietas. Para saber cuáles sí, se simula la
+actualización (`apt -s upgrade`, tampoco necesita root). Las que no instalaría no cuentan como pendientes, pero no son
+todas iguales: las de phasing salen «en espera» (se arreglan solas) y las demás «retenidas» (piden instalar o quitar
+otros paquetes, o un `apt-mark hold`: eso no se arregla solo y puede ser de seguridad).
+
+Actualizar es `sudo apt update` + `sudo apt upgrade -y`, justo esas órdenes, para que baste con permitir esas dos en
+sudoers.
 
 La actualización corre en el host desacoplada del panel (setsid + nohup) y escribe en un registro: si apt actualiza
 Docker, el contenedor del panel se reinicia y su conexión SSH se corta, y eso no puede cortar a dpkg a medias. El
@@ -11,11 +17,15 @@ import re
 import time
 
 DIR = "$HOME/.cache/pocketpanel"
-LOG, PID = f"{DIR}/apt.log", f"{DIR}/apt.pid"
+LOG, PID, KIND = f"{DIR}/apt.log", f"{DIR}/apt.pid", f"{DIR}/apt.kind"  # kind: «check» o «upgrade»
 FRESH = 300  # s: la lista se relee como mucho cada 5 min (o al acabar una actualización)
 LIST_SCRIPT = r"""
 echo @list; LC_ALL=C apt list --upgradable 2>/dev/null
 echo @stamp; stat -c %Y /var/lib/apt/periodic/update-success-stamp 2>/dev/null || stat -c %Y /var/cache/apt/pkgcache.bin
+sim=$(LC_ALL=C apt -s upgrade 2>/dev/null) && {
+  echo @inst; printf '%s\n' "$sim" | sed -n 's/^Inst \([^ :]*\).*/\1/p'
+  echo @phased; printf '%s\n' "$sim" | sed -n '/phasing:$/,/^[^ ]/{/^ /p;}'
+}
 echo @reboot; [ -e /var/run/reboot-required ] && { echo yes; cat /var/run/reboot-required.pkgs 2>/dev/null; }
 true
 """
@@ -39,9 +49,19 @@ def parse_list(out: str) -> dict:
         if m := LINE_RE.match(line):
             name, suites, new, _arch, old = m.groups()
             pkgs.append({"name": name, "from": old, "to": new, "security": "-security" in suites})
+    inst = set(secs["inst"]) if "inst" in secs else None  # sin simulación (falló), todo cuenta como pendiente
+    phased = {w.split(":")[0] for line in secs.get("phased", []) for w in line.split()}
+    for p in pkgs:
+        out = inst is not None and p["name"] not in inst
+        p["held"], p["kept"] = out and p["name"] in phased, out and p["name"] not in phased
+    # las que se instalarán, luego las que piden que hagas algo y al final las que se arreglan solas
+    pkgs.sort(key=lambda p: 2 if p["held"] else 1 if p["kept"] else 0)
+    held, kept = [p for p in pkgs if p["held"]], [p for p in pkgs if p["kept"]]
     stamp = secs.get("stamp", [])
     reboot = secs.get("reboot", [])
-    return {"packages": pkgs, "count": len(pkgs), "security": sum(p["security"] for p in pkgs),
+    return {"packages": pkgs, "count": len(pkgs) - len(held) - len(kept), "held": len(held), "kept": len(kept),
+            "kept_security": sum(p["security"] for p in kept),
+            "security": sum(p["security"] and not p["held"] and not p["kept"] for p in pkgs),
             "checked_at": int(stamp[0]) if stamp and stamp[0].isdigit() else None,
             "reboot": bool(reboot), "reboot_pkgs": reboot[1:]}
 
@@ -53,6 +73,7 @@ def run_script(upgrade: bool) -> str:
         steps += ' && { echo; echo "$ sudo apt upgrade -y"; sudo -n apt upgrade -y; }'
     inner = f'{steps}; echo "@rc $?"'
     return (f'mkdir -p "{DIR}"; if {RUNNING}; then echo busy; exit 0; fi\n'
+            f'echo {"upgrade" if upgrade else "check"} >"{KIND}"\n'
             f"setsid nohup sh -c '{inner}' </dev/null >\"{LOG}\" 2>&1 & echo $! >\"{PID}\"; echo started\n")
 
 
@@ -93,10 +114,13 @@ class Packages:
     async def listing(self, fresh: bool = False) -> dict:
         if fresh or not self._list or time.monotonic() - self._at > FRESH:
             self._list, self._at = parse_list(await self.ssh.run(LIST_SCRIPT, timeout=30)), time.monotonic()
-        return {**self._list, "running": await self.running()}
+        doing = await self.running()
+        return {**self._list, "running": bool(doing), "doing": doing}
 
-    async def running(self) -> bool:
-        return (await self.ssh.run(f"{RUNNING} && echo yes; true")).strip() == "yes"
+    async def running(self) -> str | None:
+        """Lo que está en marcha: «check» (buscar), «upgrade» (actualizar) o None."""
+        out = (await self.ssh.run(f'if {RUNNING}; then cat "{KIND}" 2>/dev/null || echo upgrade; fi; true')).strip()
+        return ("check" if out == "check" else "upgrade") if out else None
 
     async def start(self, upgrade: bool) -> None:
         out = await self.ssh.run(run_script(upgrade))

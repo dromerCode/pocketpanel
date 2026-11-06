@@ -36,6 +36,26 @@ export function toast(msg, bad = false) {
   toastTimer = setTimeout(() => (el.hidden = true), 3500);
 }
 
+/** Copia texto al portapapeles; false si no se ha podido. navigator.clipboard solo existe con HTTPS (o en
+ * localhost): por http://IP:puerto se copia a la antigua, con un textarea seleccionado y execCommand. */
+export async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch { /* sin HTTPS no hay API */ }
+  const ta = el("textarea", { readonly: "", style: "position:fixed;top:0;left:0;opacity:0" });
+  ta.value = text;
+  const back = document.activeElement;
+  document.body.append(ta);
+  ta.select();
+  ta.setSelectionRange(0, text.length);  // iOS no selecciona con select() solo
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch { /* nada */ }
+  ta.remove();
+  back?.focus?.({ preventScroll: true });
+  return ok;
+}
+
 export function fmtBytes(n) {
   if (n == null) return "–";
   const u = ["B", "KB", "MB", "GB", "TB"];

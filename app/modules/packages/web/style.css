@@ -8,3 +8,6 @@
 .pkg-ver { flex: none; color: var(--muted); max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pkg-sec { color: var(--warn); font-weight: 700; }
 .pkg-btns { display: flex; gap: 8px; margin-top: auto; }
+.pkg-btns .busy { animation: pkg-busy 1.4s ease-in-out infinite; }
+@keyframes pkg-busy { 50% { opacity: .6; } }
+.pkg-held { opacity: .55; }

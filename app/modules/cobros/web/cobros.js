@@ -1,6 +1,6 @@
 import { api, el, toast } from "/js/api.js";
 import { closeSheet, initSheet, openSheet } from "/js/ui.js";
-import { monthText, num, pct, round2, totalOf } from "./calc.js";
+import { heldNumber, monthText, num, pct, round2, totalOf } from "./calc.js";
 
 const sheet = (title, sub, ...body) => openSheet(title, sub, ...body.flat(Infinity));
 
@@ -109,6 +109,7 @@ const amount = (n, cls = "") => el("b", { class: `mono cb-amt ${cls}` }, eur(n))
 
 function render() {
   if (!S) return;
+  paintCard();  // el widget de Estado usa los mismos datos: al volver, ya está al día
   renderHub();
   renderMoves();
   renderBoard();
@@ -291,7 +292,6 @@ async function load() {
   try {
     S = await api("/api/cobros");
     render();
-    paintCard();
   } catch (e) {
     if (e.message !== "no autenticado") $("cb-hub").replaceChildren(empty(`No se pudo cargar: ${e.message}`));
   }
@@ -305,7 +305,9 @@ function payDialog(id) {
   const c = charge(id);
   if (!c) return closeSheet();
   if (c.left <= 0) return openCharge(id);
-  const method = chips(METHODS, c.payments.at(-1)?.method || store.get("method", c.client ? "transferencia" : "bizum"));
+  // la forma de pago de la última vez: aparte la de clientes (transferencia) y la de amigos (bizum)
+  const mkey = c.client ? "method" : "method-loose";
+  const method = chips(METHODS, c.payments.at(-1)?.method || store.get(mkey, c.client ? "transferencia" : "bizum"));
   const when = input({ type: "date", value: S.today });
   const part = money(Math.round(c.left * 50) / 100);
   const full = btn(`Sí, pagado (${eur(c.left)})`, () => pay(c.left), "btn-primary");
@@ -318,7 +320,7 @@ function payDialog(id) {
   const pay = async (n) => {
     if (busy) return;  // un doble toque con la red lenta no apunta el cobro dos veces
     if (!(n > 0)) return toast("¿Cuánto te ha pagado?", true);
-    store.set("method", method.get());
+    store.set(mkey, method.get());
     busy = full.disabled = savePart.disabled = true;
     try {
       if (!await call(`/charges/${id}/pay`, "POST", { amount: n, method: method.get(), date: when.value })) return;
@@ -426,12 +428,16 @@ function openCharge(id) {
   const pay = c.left > 0 ? [el("div", { class: "btn-row" }, btn("Apuntar cobro", () => payDialog(id), "btn-primary"))] : [];
 
   const inv = c.invoice;
+  // Con IVA, la factura se hace sola al cobrarlo del todo: antes solo si el cliente la pide
+  const auto = c.client && c.taxes && c.left > 0;
   const invoice = [el("h3", { class: "section-title" }, "Factura"),
     inv ? kv(["Número", inv.number, "mono"], ["Fecha", fd(inv.date)]) : el("p", { class: "cb-note" },
-      c.client ? "Aún sin factura. Hazla cuando te paguen (o antes, si te la piden)." : "Es un apunte suelto: sin factura."),
+      !c.client ? "Es un apunte suelto: sin factura."
+        : auto ? "Se hará sola cuando te lo pague del todo. Si te la pide antes, hazla ahora."
+          : c.taxes ? "Cobrado y sin factura." : "Sin IVA: no lleva factura, salvo que la hagas tú."),
     el("div", { class: "btn-row" },
       inv && S.template ? el("a", { class: "btn btn-primary", href: `/api/cobros/charges/${id}/factura.xlsx`, download: "" }, "Descargar (.xlsx)") : null,
-      inv ? btn("Cambiar", () => invoiceForm(id)) : c.client ? btn("Hacer factura", () => invoiceForm(id), "btn-primary") : null,
+      inv ? btn("Cambiar", () => invoiceForm(id)) : c.client ? btn(auto ? "Hacerla ahora" : "Hacer factura", () => invoiceForm(id), auto || !c.taxes ? "" : "btn-primary") : null,
       inv ? btn("Quitar", async () => {
         if (!confirm(`¿Quitar la factura ${inv.number}? Su número queda anulado. Si ya la enviaste, haz una rectificativa.`)) return;
         if (await call(`/charges/${id}/invoice`, "DELETE")) openCharge(id);
@@ -448,10 +454,14 @@ function openCharge(id) {
     c.payments.length ? [el("h3", { class: "section-title" }, "Cobros"), el("ul", { class: "cb-rows" }, ...c.payments.map((p, i) => el("li", {},
       el("span", {}, `${fd(p.date)} · ${METHODS.find((m) => m[0] === p.method)?.[1] || p.method}`),
       el("b", { class: "mono" }, eur(p.amount)),
-      el("button", { class: "x", type: "button", title: "Borrar este cobro", onclick: async () => {
+      el("button", { class: "x", type: "button", title: "Borrar este cobro", onclick: async (e) => {
         const undo = inv?.auto && round2(c.left + p.amount) > 0;  // deja de estar pagado: su factura automática se va
         if (!confirm(`¿Borrar el cobro de ${eur(p.amount)} del ${fd(p.date)}?${undo ? ` Se quitará también la factura ${inv.number}; recuperará ese número cuando vuelva a estar pagado. Si ya la enviaste, haz una rectificativa.` : ""}`)) return;
-        if (await call(`/charges/${id}/pay/${i}`, "DELETE")) openCharge(id);
+        const x = e.currentTarget;
+        x.disabled = true;  // va por posición: un doble toque borraría también el siguiente cobro
+        const q = new URLSearchParams({ date: p.date, amount: p.amount });
+        if (await call(`/charges/${id}/pay/${i}?${q}`, "DELETE")) openCharge(id);
+        else x.disabled = false;
       } }, "✕"))))] : null,
     ...pay, ...invoice,
     el("div", { class: "btn-row" },
@@ -523,7 +533,8 @@ function chargeForm(c, clientId, whoName) {
 function invoiceForm(id) {
   const c = charge(id);
   const cl = client(c.client);
-  const inv = c.invoice || { number: S.next_number, date: S.today, lines: [{ concept: invoiceConcept(c), qty: 1, price: c.base }],
+  // si se le quitó la automática al borrar un cobro, recupera su número
+  const inv = c.invoice || { number: heldNumber(S.annulled, id, S.today) || S.next_number, date: S.today, lines: [{ concept: invoiceConcept(c), qty: 1, price: c.base }],
     pay_text: c.state === "paid" && c.payments.length ? PAID_AS[c.payments.at(-1).method]
       : S.settings.iban ? `Transferencia bancaria a la cuenta ${S.settings.iban}` : "" };
   const number = input({ value: inv.number, required: true, class: "mono" });

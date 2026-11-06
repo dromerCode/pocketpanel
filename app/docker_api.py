@@ -1,4 +1,5 @@
 import asyncio
+import codecs
 import json
 from typing import AsyncIterator
 
@@ -66,11 +67,14 @@ class DockerClient:
         except DockerError:
             return cid, {}
         res = {"cpu": cpu_percent(self._prev.get(cid), cur), "mem": mem_usage(cur)}
-        self._prev[cid] = cur
+        self._prev[cid] = {"cpu_stats": cur.get("cpu_stats")}  # solo lo que hace falta para la siguiente
         return cid, res
 
     async def stats(self, ids: list[str]) -> dict:
-        return dict(await asyncio.gather(*(self._stats_one(i) for i in ids)))
+        out = dict(await asyncio.gather(*(self._stats_one(i) for i in ids)))
+        for gone in self._prev.keys() - set(ids):  # contenedores borrados o recreados (cada actualización da otro id)
+            del self._prev[gone]
+        return out
 
     async def action(self, name: str, verb: str) -> None:
         if verb not in ("start", "stop", "restart"):
@@ -90,13 +94,14 @@ class DockerClient:
             if r.status_code >= 400:
                 raise DockerError("no se pueden leer los logs")
             rest = b""
+            text = codecs.getincrementaldecoder("utf-8")("replace")  # una «ñ» partida entre dos trozos no sale «�»
             async for chunk in r.aiter_bytes():
                 if tty:
                     data = chunk
                 else:
                     data, rest = demux(rest + chunk)
-                if data:
-                    yield data.decode("utf-8", "replace")
+                if data and (out := text.decode(data)):
+                    yield out
 
     # --- operaciones para recrear contenedores (actualizaciones) ---
 
