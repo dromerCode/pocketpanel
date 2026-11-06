@@ -1,6 +1,6 @@
 import { api, el, toast } from "/js/api.js";
 import { closeSheet, initSheet, openSheet } from "/js/ui.js";
-import { monthText, num, pct, round2, totalOf } from "./calc.js";
+import { heldNumber, monthText, num, pct, round2, totalOf } from "./calc.js";
 
 const sheet = (title, sub, ...body) => openSheet(title, sub, ...body.flat(Infinity));
 
@@ -534,8 +534,7 @@ function invoiceForm(id) {
   const c = charge(id);
   const cl = client(c.client);
   // si se le quitó la automática al borrar un cobro, recupera su número
-  const held = S.annulled.find((a) => a.reusable && a.charge === id)?.number;
-  const inv = c.invoice || { number: held || S.next_number, date: S.today, lines: [{ concept: invoiceConcept(c), qty: 1, price: c.base }],
+  const inv = c.invoice || { number: heldNumber(S.annulled, id, S.today) || S.next_number, date: S.today, lines: [{ concept: invoiceConcept(c), qty: 1, price: c.base }],
     pay_text: c.state === "paid" && c.payments.length ? PAID_AS[c.payments.at(-1).method]
       : S.settings.iban ? `Transferencia bancaria a la cuenta ${S.settings.iban}` : "" };
   const number = input({ value: inv.number, required: true, class: "mono" });

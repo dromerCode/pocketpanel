@@ -20,3 +20,8 @@ export const monthText = (iso) => {
   const d = new Date(`${iso}T12:00:00`);
   return `${d.toLocaleDateString("es-ES", { month: "long" })} de ${d.getFullYear()}`;
 };
+
+// El número que recupera una factura automática que se quitó al borrar un cobro. De otro año, no: la numeración de este
+// año no iría en orden (lo mismo que hace auto_invoice en store.py)
+export const heldNumber = (annulled, id, today) => annulled.find((a) => a.reusable && a.charge === id
+  && a.number.startsWith(`${today.slice(0, 4)}-`))?.number;
