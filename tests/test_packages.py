@@ -22,7 +22,7 @@ def test_parse_list():
     p = parse_list(LIST)
     assert p["count"] == 3 and p["security"] == 1
     assert p["packages"][1] == {"name": "openssl", "from": "3.5.1-1ubuntu1", "to": "3.5.1-1ubuntu2", "security": True,
-                                "held": False}
+                                "held": False, "kept": False}
     assert p["held"] == 0  # sin simulación (falló o apt viejo), todo cuenta
     assert p["checked_at"] == 1793158413
     assert p["reboot"] and p["reboot_pkgs"] == ["linux-image-7.0.0-42-generic"]
@@ -30,20 +30,36 @@ def test_parse_list():
 
 def test_parse_list_up_to_date():
     p = parse_list("@list\nListing...\n@stamp\n@reboot\n")
-    assert p == {"packages": [], "count": 0, "held": 0, "security": 0, "checked_at": None, "reboot": False,
-                 "reboot_pkgs": []}
+    assert p == {"packages": [], "count": 0, "held": 0, "kept": 0, "kept_security": 0, "security": 0, "checked_at": None,
+                 "reboot": False, "reboot_pkgs": []}
 
 
 def test_parse_list_phasing():
     """Lo que `apt upgrade` aún no instala (phasing) sale en espera, al final, y no cuenta: si contara, el botón de
     actualizar no haría nada y seguiría ahí."""
-    out = LIST.replace("@reboot\n", "@inst\nopenssl\n@reboot\n")
+    out = LIST.replace("@reboot\n", "@inst\nopenssl\n@phased\n  bpftool google-chrome-stable\n@reboot\n")
     p = parse_list(out)
     assert p["count"] == 1 and p["held"] == 2 and p["security"] == 1
     assert [(x["name"], x["held"]) for x in p["packages"]] == [
         ("openssl", False), ("bpftool", True), ("google-chrome-stable", True)]
-    p = parse_list(LIST.replace("@reboot\n", "@inst\n@reboot\n"))  # todo en espera
+    p = parse_list(LIST.replace("@reboot\n", "@inst\n@phased\n  bpftool openssl google-chrome-stable\n@reboot\n"))  # todo en espera
     assert p["count"] == 0 and p["held"] == 3 and p["security"] == 0
+
+
+def test_parse_list_kept_back_is_not_phasing():
+    """Lo que apt retiene (dependencias nuevas, apt-mark hold) no se arregla solo: no sale como «en espera»."""
+    p = parse_list(LIST + "@inst\nbpftool\n@phased\n  openssl\n@reboot\n")
+    assert (p["count"], p["held"], p["kept"]) == (1, 1, 1)
+    by = {x["name"]: (x["held"], x["kept"]) for x in p["packages"]}
+    assert by == {"bpftool": (False, False), "openssl": (True, False), "google-chrome-stable": (False, True)}
+    assert [x["name"] for x in p["packages"]] == ["bpftool", "google-chrome-stable", "openssl"]  # lo tuyo antes
+
+
+def test_parse_list_kept_back_security_still_warns():
+    p = parse_list(LIST + "@inst\n@phased\n  bpftool google-chrome-stable\n@reboot\n")
+    assert p["kept"] == 1 and p["kept_security"] == 1 and p["security"] == 0
+    p = parse_list(LIST + "@inst\n@phased\n  bpftool  openssl:amd64  google-chrome-stable\n@reboot\n")  # apt 3, por columnas
+    assert p["kept"] == 0 and p["held"] == 3 and p["kept_security"] == 0
 
 
 def test_parse_job():
