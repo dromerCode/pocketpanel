@@ -1,4 +1,4 @@
-import { api, el, fmtAgo, panel, toast } from "/js/api.js";
+import { api, copyText, el, fmtAgo, panel, toast } from "/js/api.js";
 import { closeSheet, initSheet, openSheet as sheet } from "/js/ui.js";
 
 const $ = (id) => document.getElementById(id);
@@ -185,7 +185,7 @@ async function share(link, label) {
   if (navigator.share) {
     try { await navigator.share({ title: "Invitación a PichaFlix", text: label ? `Invitación a PichaFlix (${label})` : "Invitación a PichaFlix", url: link }); return; } catch { /* cancelado */ }
   }
-  try { await navigator.clipboard.writeText(link); toast("Enlace copiado"); } catch { toast("No se pudo copiar; mantén pulsado el enlace", true); }
+  if (await copyText(link)) toast("Enlace copiado"); else toast("No se pudo copiar; mantén pulsado el enlace", true);
 }
 
 function openInvite(code) {
@@ -195,7 +195,7 @@ function openInvite(code) {
     el("div", { class: "linkbox" }, i.link),
     el("div", { class: "btn-row" },
       el("button", { class: "btn btn-primary", onclick: () => share(i.link, i.label) }, "Compartir"),
-      el("button", { class: "btn", onclick: async () => { try { await navigator.clipboard.writeText(i.link); toast("Enlace copiado"); } catch { toast("No se pudo copiar", true); } } }, "Copiar")),
+      el("button", { class: "btn", onclick: async () => { if (await copyText(i.link)) toast("Enlace copiado"); else toast("No se pudo copiar", true); } }, "Copiar")),
     el("dl", { class: "kv" },
       el("dt", {}, "Enlace válido hasta"), el("dd", {}, i.valid_till ? fmtDate(i.valid_till) : "—"),
       el("dt", {}, "Creada"), el("dd", {}, i.created ? fmtAgo(i.created) : "—"),
