@@ -1,0 +1,65 @@
+<section id="view-clientes" class="view" data-view="clientes" hidden>
+  <header class="topbar">
+    <h1>Clientes</h1>
+    <div class="cl-tools">
+      <button id="cl-job" class="btn btn-sm" type="button" hidden></button>
+      <button id="cl-refresh" class="btn btn-sm" type="button" title="Volver a comprobar todo">↻ Actualizar</button>
+    </div>
+  </header>
+  <div class="scroll cl-page">
+    <section id="cl-hero" class="cl-card cl-hero"><p class="cl-empty">Cargando…</p></section>
+
+    <section class="cl-card">
+      <header class="cl-head">
+        <div class="cl-title"><span>Proyectos</span><span class="cl-hint">Cada web, si responde y qué versión tiene publicada. Toca una para ver sus acciones.</span></div>
+        <button id="cl-new" class="btn btn-sm" type="button">+ Proyecto</button>
+      </header>
+      <div id="cl-projects" class="cl-body"></div>
+    </section>
+
+    <div class="cl-two">
+      <section class="cl-card">
+        <header class="cl-head">
+          <div class="cl-title"><span>Máquina virtual</span><span class="cl-hint">El servidor de Oracle que sirve las webs normalmente.</span></div>
+          <span id="cl-vm-badge" class="badge"></span>
+        </header>
+        <div id="cl-vm" class="cl-body cl-pad"></div>
+      </section>
+      <section class="cl-card">
+        <header class="cl-head">
+          <div class="cl-title"><span>Copias de seguridad</span><span class="cl-hint">Cada noche se bajan los datos de la VM a casa y se guarda el historial.</span></div>
+          <span id="cl-bk-badge" class="badge"></span>
+        </header>
+        <div id="cl-backups" class="cl-body cl-pad"></div>
+      </section>
+    </div>
+
+    <div class="cl-two">
+      <section class="cl-card">
+        <header class="cl-head">
+          <div class="cl-title"><span>DNS</span><span class="cl-hint">A qué máquina manda Cloudflare cada dominio.</span></div>
+          <span id="cl-dns-badge" class="badge"></span>
+        </header>
+        <div id="cl-dns" class="cl-body"></div>
+      </section>
+      <section class="cl-card">
+        <header class="cl-head">
+          <div class="cl-title"><span>Tareas programadas</span><span class="cl-hint">Lo que este servidor hace solo (cron).</span></div>
+          <span id="cl-cron-badge" class="badge"></span>
+        </header>
+        <div id="cl-crons" class="cl-body"></div>
+      </section>
+    </div>
+
+    <section class="cl-card">
+      <header class="cl-head">
+        <div class="cl-title"><span>Registro</span><span class="cl-hint">Lo que ha ido pasando: copias, despliegues, cortes y cambios.</span></div>
+        <div class="seg" id="cl-ev-filter">
+          <button class="seg-btn" type="button" data-f="main">Importante</button>
+          <button class="seg-btn" type="button" data-f="all">Todo</button>
+        </div>
+      </header>
+      <div id="cl-events" class="cl-body"></div>
+    </section>
+  </div>
+</section>

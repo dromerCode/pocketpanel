@@ -101,3 +101,7 @@ modules:
     jellyfin_url: http://127.0.0.1:8096
     public_url: ""             # web pública de jfa-go (enlaces de invitación)
     db: ""                     # ruta a jellyfin.db para ver fechas de alta (opcional, necesita sqlite3)
+
+  clientes:                    # webs de clientes servidas desde una VM con relevo en casa (scripts de ~/bin/clientes)
+    enabled: false
+    script: ~/bin/clientes/panel.sh
