@@ -21,6 +21,7 @@ modules:
   packages: {enabled: true}
   cobros: {enabled: true}
   ntfy: {enabled: true}
+  clientes: {enabled: true}
 """
 NONE = """
 name: casa-ramon
