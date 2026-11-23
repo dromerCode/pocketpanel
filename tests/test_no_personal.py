@@ -5,7 +5,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
 FORBIDDEN = re.compile(r"/DATA\b|AppData|[Pp]ichahouse|tail41f6d6|[Pp]ichaserver|[Pp]ichaflix|HDDRaid|192\.168\.|"
-                       r"dev-disk-by-uuid|\b[Oo][Mm][Vv]\b|\b[Pp]icha\b|[Zz]ima[Oo][Ss]|[Cc]asa[Oo][Ss]")
+                       r"dev-disk-by-uuid|\b[Oo][Mm][Vv]\b|\b[Pp]icha\b|[Zz]ima[Oo][Ss]|[Cc]asa[Oo][Ss]|"
+                       r"[Rr]amndev|[Rr]amnserver")
 
 
 def tracked_files():

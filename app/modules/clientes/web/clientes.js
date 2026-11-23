@@ -85,7 +85,7 @@ function renderHero() {
   if (st.failed) { box.className = "cl-card cl-hero bad"; return box.replaceChildren(empty(`No se pudo leer el estado: ${st.failed}`)); }
   const home = st.mode === "casa", unknown = st.mode === "desconocido";
   const up = st.projects.filter((p) => p.ok).length;
-  const title = unknown ? "No se sabe dónde están servidas" : home ? "Servidas desde casa (relevo)" : "Servidas desde la VM de Oracle";
+  const title = unknown ? "No se sabe dónde están servidas" : home ? "Servidas desde casa (relevo)" : "Servidas desde la VM";
   const bits = [`${up} de ${st.projects.length} webs responden`];
   if (home && st.since) bits.push(`en casa desde el ${st.since.slice(0, 16)}`);
   if (st.backup_at) bits.push(`última copia ${fmtAgo(st.backup_at)}`);
@@ -340,7 +340,7 @@ function npmSheet(then) {
   const ok = el("button", { class: "btn btn-primary", type: "submit" }, "Comprobar y guardar");
   const form = el("form", { class: "form" },
     note("Los de tu cuenta de Nginx Proxy Manager (el panel de casa en el puerto 81). Con ellos el panel crea y quita el proxy de cada prueba."),
-    field("Correo", email), field("Contraseña", pass, "Se comprueba con Nginx Proxy Manager y se guarda solo en ramnserver (~/.config/npm-cred, permisos 600)."),
+    field("Correo", email), field("Contraseña", pass, "Se comprueba con Nginx Proxy Manager y se guarda solo en este servidor (~/.config/npm-cred, permisos 600)."),
     err, el("div", { class: "sheet-actions" }, el("button", { class: "btn", type: "button", onclick: closeSheet }, "Cancelar"), ok));
   form.onsubmit = async (e) => {
     e.preventDefault(); err.hidden = true; ok.disabled = true; ok.textContent = "Comprobando…";
@@ -511,7 +511,10 @@ function devForm(preselect) {
   const modeField = field("Datos iniciales", mode, "La copia no lleva suscripciones push ni claves de avisos: la prueba no puede escribir a tus clientes.");
   const checkDomain = () => {
     const v = domain.value.trim().toLowerCase(), why = usedDomains.get(v);
-    domHelp.textContent = why ? `⚠ ${v} ${why}. Elige otro (p. ej. ${v.split(".")[0]}-test.${v.split(".").slice(1).join(".")}).` : "Por defecto en ramndev.com (con -test si ya está en producción). Puedes poner otro.";
+    const base = S.pb?.test_domain;
+    domHelp.textContent = why ? `⚠ ${v} ${why}. Elige otro (p. ej. ${v.split(".")[0]}-test.${v.split(".").slice(1).join(".")}).`
+      : base ? `Por defecto en ${base} (con -test si ya está en producción). Puedes poner otro.`
+        : "El subdominio completo (p. ej. tienda-test.midominio.com). Pon el dominio de las pruebas en ⚙ Módulos para que se proponga solo.";
     domHelp.className = why ? "help cl-bad" : "help";
   };
   const sync = () => {
@@ -519,7 +522,7 @@ function devForm(preselect) {
     for (const f of newOnly) f.style.display = p ? "none" : "";
     modeField.style.display = p && p.data ? "" : "none";
     const n = p ? p.name : name.value.trim();
-    if (!domTouched) domain.value = n ? `${n}${p ? "-test" : ""}.ramndev.com` : "";
+    if (!domTouched) domain.value = n && S.pb?.test_domain ? `${n}${p ? "-test" : ""}.${S.pb.test_domain}` : "";
     if (p) { port.value = freePort(p.port + 1000); path.value = p.path; pick.load(p.repo); }
     else if (!port.value || usedPorts.has(Number(port.value))) port.value = freePort(9080);
     checkDomain();

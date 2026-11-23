@@ -9,5 +9,8 @@ MODULE = Module(
     fields=[
         field("script", "Script del panel", default="~/bin/clientes/panel.sh", required=True,
               help="El script que lee el estado y lanza las acciones."),
+        field("test_domain", "Dominio de las pruebas", default="",
+              help="Bajo qué dominio se propone el subdominio de cada prueba (p. ej. midominio.com → "
+                   "tienda-test.midominio.com). Vacío: se escribe a mano."),
     ],
 )

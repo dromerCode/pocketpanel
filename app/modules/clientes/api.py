@@ -9,7 +9,8 @@ from .clientes import Clientes, ClientesError
 
 
 def setup(ctx) -> APIRouter:
-    cl = Clientes(ctx.ssh, ctx.cfg.mod("clientes")["script"])
+    mod = ctx.cfg.mod("clientes")
+    cl = Clientes(ctx.ssh, mod["script"], mod.get("test_domain") or "")
     # Con varias pantallas abiertas (o el widget y la pestaña) se pregunta una vez
     estado = Shared(cl.estado, ttl=8)
     versiones = Shared(cl.versiones, ttl=300)

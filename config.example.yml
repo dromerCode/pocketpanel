@@ -105,3 +105,4 @@ modules:
   clientes:                    # webs de clientes servidas desde una VM con relevo en casa (scripts de ~/bin/clientes)
     enabled: false
     script: ~/bin/clientes/panel.sh
+    test_domain: ""            # dominio de las pruebas (tienda-test.<este>); vacío: se escribe a mano

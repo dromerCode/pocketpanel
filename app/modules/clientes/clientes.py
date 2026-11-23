@@ -14,9 +14,9 @@ from datetime import datetime
 
 OK_HTTP = {"200", "301", "302"}
 NAME_RE = re.compile(r"^[a-z][a-z0-9-]{1,30}$")
-REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+REPO_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9-]*/(?!\.{1,2}$)[A-Za-z0-9_.-]+$")  # usuario/repo de GitHub
 PATH_RE = re.compile(r"^/[A-Za-z0-9/_.-]*$")
-DOMAIN_RE = re.compile(r"^([a-z0-9-]+\.)+[a-z]{2,}$")
+DOMAIN_RE = re.compile(r"^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$")
 SNAP_RE = re.compile(r"^[0-9a-f]{8,64}$")
 BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]{1,100}$")
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -414,6 +414,14 @@ def _branch(value) -> str:
     return value
 
 
+def _valid_branch(value) -> bool:
+    try:
+        _branch(value)
+        return True
+    except ClientesError:
+        return False
+
+
 def _one_domain(value) -> str:
     d = _domains(value if isinstance(value, str) else "")
     if " " in d:
@@ -491,9 +499,13 @@ def build_action(b: dict) -> list[str]:
 
 
 class Clientes:
-    def __init__(self, ssh, script: str):
+    def __init__(self, ssh, script: str, test_domain: str = ""):
         if not SCRIPT_RE.match(script):
             raise ClientesError("ruta del script no válida")
+        test_domain = (test_domain or "").strip().lower()
+        if test_domain and not DOMAIN_RE.match(test_domain):
+            raise ClientesError(f"dominio de las pruebas no válido: {test_domain}")
+        self.test_domain = test_domain
         # «~/x» → "$HOME/x": entre comillas la tilde no se expande
         self.script = f'"$HOME/{script[2:]}"' if script.startswith("~/") else shlex.quote(script)
         self.ssh = ssh
@@ -527,13 +539,14 @@ class Clientes:
             raise ClientesError(out.splitlines()[-1] if out else "no se pudo guardar")
 
     async def pruebas(self) -> dict:
-        return parse_pruebas(await self.sh("pruebas"))
+        # el dominio bajo el que la app propone el subdominio de cada prueba (vacío: se escribe a mano)
+        return {**parse_pruebas(await self.sh("pruebas")), "test_domain": self.test_domain}
 
     async def ramas(self, repo: str) -> list[str]:
         if not isinstance(repo, str) or not REPO_RE.match(repo):
             raise ClientesError("el repositorio va como usuario/repo")
         out = await self.sh("ramas", repo, timeout=30)
-        return [x.strip() for x in out.splitlines() if BRANCH_RE.match(x.strip())]
+        return [x.strip() for x in out.splitlines() if _valid_branch(x.strip())]
 
     async def logs(self, name: str, lines: int, dev: bool = False) -> list[str]:
         if dev:

@@ -164,11 +164,11 @@ no
 2026-11-19 02:00:17
 
 @@produccion
-revigenda|ramn100dev/revigenda|docker|si|/login|8088
-ramndev|ramn100dev/ramndev-web|web|no|/|8085
+agenda|usuario/agenda|docker|si|/login|8088
+miweb|usuario/miweb-web|web|no|/|8085
 @@pruebas
-revigenda|ramn100dev/revigenda|docker|9088|revisiones-cliente|revigenda-test.ramndev.com|si|/login|running|Up 3 minutes|200|1111111|si|copia de producción del 2026-11-19|abc1234|1763500000|Arreglo | con barra
-nuevo|ramn100dev/nuevo|web|9080|main|nuevo.ramndev.com|no|/|exited|Exited (0)||?|no||def5678|1763400000|Primero
+agenda|usuario/agenda|docker|9088|revisiones-cliente|agenda-test.example.org|si|/login|running|Up 3 minutes|200|1111111|si|copia de producción del 2026-11-19|abc1234|1763500000|Arreglo | con barra
+nuevo|usuario/nuevo|web|9080|main|nuevo.example.org|no|/|exited|Exited (0)||?|no||def5678|1763400000|Primero
 """
 
 
@@ -176,7 +176,7 @@ def test_parse_pruebas():
     from app.modules.clientes.clientes import parse_pruebas
     d = parse_pruebas(PRUEBAS_OUT)
     assert d["npm"] is False and d["backup_at"]
-    assert [p["name"] for p in d["production"]] == ["revigenda", "ramndev"]
+    assert [p["name"] for p in d["production"]] == ["agenda", "miweb"]
     a, b = d["items"]
     assert a["ok"] and a["running"] and a["behind"] and a["in_prod"] and a["commit_msg"] == "Arreglo | con barra"
     assert a["branch"] == "revisiones-cliente" and a["port"] == 9088
@@ -186,9 +186,9 @@ def test_parse_pruebas():
 def test_build_action_pruebas():
     import pytest
     from app.modules.clientes.clientes import ClientesError, build_action
-    assert build_action({"action": "prueba-crear", "name": "revigenda", "port": 9088, "branch": "feature/x",
-                         "domain": "revigenda-test.ramndev.com", "path": "/login", "mode": "copia"}) == \
-        ["prueba-crear", "revigenda", "-", "web", "9088", "feature/x", "revigenda-test.ramndev.com", "no", "/login", "copia"]
+    assert build_action({"action": "prueba-crear", "name": "agenda", "port": 9088, "branch": "feature/x",
+                         "domain": "agenda-test.example.org", "path": "/login", "mode": "copia"}) == \
+        ["prueba-crear", "agenda", "-", "web", "9088", "feature/x", "agenda-test.example.org", "no", "/login", "copia"]
     assert build_action({"action": "prueba-actualizar", "name": "gacha", "branch": "main"}) == ["prueba-actualizar", "gacha", "main"]
     assert build_action({"action": "prueba-datos", "name": "gacha", "mode": "vacios", "confirm": "gacha"}) == ["prueba-datos", "gacha", "vacios"]
     for bad in ({"action": "prueba-actualizar", "name": "gacha", "branch": "--upload-pack=x"},
@@ -230,3 +230,40 @@ async def test_npm_cred_goes_by_stdin_not_in_the_command():
     with pytest.raises(ClientesError, match="no acepta"):
         await Clientes(FakeSSH("Nginx Proxy Manager no acepta ese correo y contraseña\n"),
                        "~/bin/clientes/panel.sh").npm_cred("yo@example.com", "mala")
+
+
+# ---------------------------------------------------------------- revisión: nada fijo del servidor de su autor
+class _SSH:
+    def __init__(self, out):
+        self.out = out
+
+    async def run(self, cmd, timeout=15, input=None):
+        return self.out
+
+
+async def test_pruebas_lleva_el_dominio_de_las_pruebas_de_la_config():
+    from app.modules.clientes.clientes import Clientes
+    d = await Clientes(_SSH(PRUEBAS_OUT), "~/bin/clientes/panel.sh", test_domain="Pruebas.Example.org").pruebas()
+    assert d["test_domain"] == "pruebas.example.org"
+    d = await Clientes(_SSH(PRUEBAS_OUT), "~/bin/clientes/panel.sh").pruebas()
+    assert d["test_domain"] == ""
+
+
+def test_dominio_de_pruebas_no_valido():
+    from app.modules.clientes.clientes import Clientes
+    for bad in ("no dominio", "-x.com", "a.com;id"):
+        with pytest.raises(ClientesError):
+            Clientes(_SSH(""), "~/bin/clientes/panel.sh", test_domain=bad)
+
+
+async def test_ramas_no_ofrece_las_que_no_se_podrian_usar():
+    from app.modules.clientes.clientes import Clientes
+    out = "main\n-mala\nfeat/a..b\n/raiz\nfeat/pago\n"
+    assert await Clientes(_SSH(out), "~/bin/clientes/panel.sh").ramas("demo/tienda") == ["main", "feat/pago"]
+
+
+@pytest.mark.parametrize("repo", ["../x", "./x", "a/..", "a/.", "-a/b"])
+def test_repo_no_valido(repo):
+    with pytest.raises(ClientesError):
+        build_action({"action": "nuevo", "name": "tienda", "repo": repo, "type": "web", "port": 9000,
+                      "domains": "tienda.example.com"})
