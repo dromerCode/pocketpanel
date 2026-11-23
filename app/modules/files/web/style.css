@@ -59,6 +59,14 @@
 .fm-progress .btn { grid-column: 2; grid-row: 1 / 3; }
 @keyframes fm-indet { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
 
+/* menú del clic derecho */
+.fm-menu { position: fixed; z-index: 40; min-width: 210px; max-width: calc(100vw - 16px); padding: 4px; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 28px rgb(0 0 0 / .45); }
+.fm-menu button { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 7px 10px; background: none; border: 0; border-radius: 7px; color: var(--text); font-size: 13.5px; text-align: left; cursor: pointer; }
+.fm-menu button.fm-danger { color: var(--danger); }
+.fm-menu button:hover, .fm-menu button:focus-visible { background: var(--surface-2); outline: none; }
+.fm-menu kbd { font: 11px var(--mono, monospace); color: var(--muted); }
+.fm-menu hr { margin: 4px 6px; border: 0; border-top: 1px solid var(--line); }
+
 .fm-drop { position: absolute; inset: 8px; z-index: 6; display: grid; place-items: center; border: 2px dashed var(--accent); border-radius: 16px; background: rgb(16 17 19 / .85); font-weight: 600; pointer-events: none; }
 
 #fm-sheet .sheet-panel { height: 92dvh; }

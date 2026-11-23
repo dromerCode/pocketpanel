@@ -1,10 +1,11 @@
 // Archivos: navegar, seleccionar, portapapeles (copiar/cortar → pegar en otra carpeta), subir, descargar y un
 // visor/editor sencillo. La ruta va en el hash (#files/<ruta>) para que «atrás» del móvil suba de carpeta.
 //
-// Con ratón: clic selecciona (Ctrl/⌘ suma, Mayús un rango), doble clic abre. Con el dedo: tocar abre, mantener
-// pulsado (o tocar el icono) selecciona y, con algo seleccionado, tocar suma o quita. Teclado: Ctrl+A/C/X/V, Supr,
-// F2, Intro, Retroceso y Esc.
-import { api, el, fmtBytes, toast } from "/js/api.js";
+// Con ratón: clic selecciona (Ctrl/⌘ suma, Mayús un rango), doble clic abre y el clic derecho saca el menú (en una
+// fila: lo de esa fila o de la selección; en el hueco: lo de la carpeta). Con el dedo: tocar abre, mantener pulsado
+// (o tocar el icono) selecciona y, con algo seleccionado, tocar suma o quita. Teclado: Ctrl+A/C/X/V, Alt+Mayús+C
+// (copiar la ruta), Supr, F2, Intro, Retroceso, Esc y la tecla de menú (o Mayús+F10).
+import { api, copyText, el, fmtBytes, toast } from "/js/api.js";
 import { watchJob } from "/js/ui.js";
 
 const $ = (id) => document.getElementById(id);
@@ -270,19 +271,37 @@ function ask(title, label, value, okText, onok) {
   input.setSelectionRange(0, dot > 0 ? dot : (value || "").length);  // sin la extensión, como en el escritorio
 }
 
+const newDir = () => ask("Nueva carpeta", "Nombre", "", "Crear", async (name) => {
+  await api("/api/files/new", { method: "POST", body: { path: cur.path, name, dir: true } });
+  await open(cur.path);
+  select(name, "only");
+});
+const newFile = () => ask("Nuevo archivo de texto", "Nombre", "nuevo.txt", "Crear", async (name) => {
+  await api("/api/files/new", { method: "POST", body: { path: cur.path, name, dir: false } });
+  await open(cur.path);
+  activate(name);
+});
+
 function newItem() {
   sheet("Nuevo", cur.path, el("div", { class: "btn-row fm-new" },
-    el("button", { class: "btn", type: "button", onclick: () => ask("Nueva carpeta", "Nombre", "", "Crear", async (name) => {
-      await api("/api/files/new", { method: "POST", body: { path: cur.path, name, dir: true } });
-      await open(cur.path);
-      select(name, "only");
-    }) }, "Carpeta"),
-    el("button", { class: "btn", type: "button", onclick: () => ask("Nuevo archivo de texto", "Nombre", "nuevo.txt", "Crear", async (name) => {
-      await api("/api/files/new", { method: "POST", body: { path: cur.path, name, dir: false } });
-      await open(cur.path);
-      activate(name);
-    }) }, "Archivo de texto"),
+    el("button", { class: "btn", type: "button", onclick: newDir }, "Carpeta"),
+    el("button", { class: "btn", type: "button", onclick: newFile }, "Archivo de texto"),
     el("button", { class: "btn", type: "button", onclick: () => { closeSheet(true); $("fm-upload").click(); } }, "Subir archivos")));
+}
+
+function selectAll() {
+  items.forEach((e) => sel.add(e.name));
+  select(null, "none");
+}
+
+async function copyPaths(paths) {
+  const text = paths.join("\n");
+  if (await copyText(text)) return toast(paths.length === 1 ? "Ruta copiada" : `${paths.length} rutas copiadas`);
+  // el navegador no deja: que se pueda copiar a mano
+  const ta = el("textarea", { class: "fm-text mono", readonly: "" });
+  ta.value = text;
+  sheet(paths.length === 1 ? "Ruta" : "Rutas", "No se ha podido copiar sola: selecciónala y cópiala a mano", ta);
+  ta.select();
 }
 
 function rename() {
@@ -378,6 +397,74 @@ function progress(text, pct = null, onlog = null) {
   $("fm-progress-log").onclick = onlog;
 }
 
+// --- menú (clic derecho) -----------------------------------------------------------------------------------
+let menuEl = null;
+function closeMenu() {
+  menuEl?.remove();
+  menuEl = null;
+}
+
+/** entries: { label, fn, key?, danger? }, "-" para una raya, o algo falso para lo que no toca. */
+function menu(x, y, entries) {
+  closeMenu();
+  const list = [];
+  for (const e of entries) if (e && !(e === "-" && (!list.length || list.at(-1) === "-"))) list.push(e);
+  if (list.at(-1) === "-") list.pop();
+  menuEl = el("div", { class: "fm-menu", role: "menu" }, ...list.map((e) => (e === "-" ? el("hr") :
+    el("button", { type: "button", role: "menuitem", class: e.danger ? "fm-danger" : null, onclick: () => { closeMenu(); e.fn(); } },
+      el("span", {}, e.label), e.key ? el("kbd", {}, e.key) : null))));
+  document.body.append(menuEl);
+  const r = menuEl.getBoundingClientRect();  // que no se salga de la pantalla
+  menuEl.style.left = `${Math.max(8, Math.min(x, innerWidth - r.width - 8))}px`;
+  menuEl.style.top = `${y + r.height > innerHeight - 8 ? Math.max(8, y - r.height) : y}px`;
+  menuEl.querySelector("button")?.focus({ preventScroll: true });
+}
+
+function itemMenu(x, y) {
+  const n = sel.size, one = n === 1 ? entry([...sel][0]) : null;
+  menu(x, y, [
+    one && { label: "Abrir", fn: () => activate(one.name), key: "Intro" },
+    "-",
+    { label: "Copiar", fn: () => toClip("copy"), key: "Ctrl+C" },
+    { label: "Cortar", fn: () => toClip("cut"), key: "Ctrl+X" },
+    clip && !busy && { label: "Pegar aquí", fn: paste, key: "Ctrl+V" },
+    { label: n === 1 ? "Copiar ruta" : `Copiar ${n} rutas`, fn: () => copyPaths(selected()), key: "Alt+Mayús+C" },
+    "-",
+    one && { label: "Renombrar", fn: rename, key: "F2" },
+    { label: "Descargar", fn: download },
+    "-",
+    { label: "Borrar", fn: remove, key: "Supr", danger: true },
+  ]);
+}
+
+function folderMenu(x, y) {
+  menu(x, y, [
+    { label: "Nueva carpeta", fn: newDir },
+    { label: "Nuevo archivo de texto", fn: newFile },
+    { label: "Subir archivos", fn: () => $("fm-upload").click() },
+    clip && !busy && { label: "Pegar aquí", fn: paste, key: "Ctrl+V" },
+    "-",
+    { label: "Copiar la ruta de esta carpeta", fn: () => copyPaths([cur.path]), key: "Alt+Mayús+C" },
+    items.length > 0 && { label: "Seleccionar todo", fn: selectAll, key: "Ctrl+A" },
+  ]);
+}
+
+/** El menú desde el teclado: junto a la fila seleccionada o, sin selección, arriba de la lista. */
+function keyMenu() {
+  const li = anchor != null && sel.has(anchor) && $("fm-list").querySelector(`[data-name="${CSS.escape(anchor)}"]`);
+  const r = (li || $("fm-wrap")).getBoundingClientRect();
+  sel.size ? itemMenu(r.left + 48, li ? r.bottom : r.top + 8) : folderMenu(r.left + 48, r.top + 8);
+}
+
+function menuKey(ev) {
+  if (ev.key === "Escape") { ev.preventDefault(); closeMenu(); return; }
+  if (ev.key !== "ArrowDown" && ev.key !== "ArrowUp") return;  // Intro y Tab, lo suyo
+  ev.preventDefault();
+  const bs = [...menuEl.querySelectorAll("button")];
+  const i = bs.indexOf(document.activeElement);
+  bs[(i + (ev.key === "ArrowDown" ? 1 : -1) + bs.length) % bs.length]?.focus();
+}
+
 // --- subir -------------------------------------------------------------------------------------------------
 function put(dir, file, onprogress) {
   return new Promise((ok, bad) => {
@@ -456,9 +543,24 @@ function wireList() {
   for (const t of ["pointerup", "pointercancel", "pointermove"]) {
     list.addEventListener(t, (ev) => { if (t !== "pointermove" || Math.abs(ev.movementY) > 4) clearTimeout(press); });
   }
-  list.addEventListener("contextmenu", (ev) => { if (!fine.matches && nameOf(ev) != null) ev.preventDefault(); });
+  const wrap = $("fm-wrap");
+  wrap.addEventListener("contextmenu", (ev) => {
+    const name = nameOf(ev);
+    if (!mouse(ev)) { if (name != null) ev.preventDefault(); return; }  // con el dedo, mantener pulsado selecciona
+    ev.preventDefault();
+    if (name == null) {  // en el hueco: lo de la carpeta
+      sel.clear();
+      select(null, "none");
+      return folderMenu(ev.clientX, ev.clientY);
+    }
+    if (!sel.has(name)) select(name, "only");  // sobre algo seleccionado: para toda la selección
+    itemMenu(ev.clientX, ev.clientY);
+  });
+  wrap.addEventListener("scroll", closeMenu, { passive: true });
   // clic en el hueco: quitar la selección
-  $("fm-wrap").addEventListener("click", (ev) => { if (ev.target.id === "fm-wrap" || ev.target.id === "fm-list") select(null, "none"); });
+  wrap.addEventListener("click", (ev) => {
+    if (ev.target.id === "fm-wrap" || ev.target.id === "fm-list") { sel.clear(); select(null, "none"); }
+  });
 }
 
 function wireDrop() {
@@ -479,6 +581,7 @@ function wireDrop() {
 
 function onKey(ev) {
   if ($("view-files").hidden) return;
+  if (menuEl) return menuKey(ev);
   if (!$("fm-sheet").hidden) { if (ev.key === "Escape") closeSheet(); return; }
   const t = ev.target instanceof Element ? ev.target : document.body;
   const typing = t.matches("input, textarea, select");
@@ -486,7 +589,9 @@ function onKey(ev) {
   if (typing) { if (ev.key === "Escape") t.blur(); return; }
   if (ev.key === "Enter" && t.closest("button, a")) return;  // que haga lo suyo el botón
   const k = ev.key.toLowerCase();
-  if (mod && k === "a") { ev.preventDefault(); items.forEach((e) => sel.add(e.name)); select(null, "none"); }
+  if (ev.altKey && ev.shiftKey && ev.code === "KeyC") { ev.preventDefault(); copyPaths(sel.size ? selected() : [cur.path]); }
+  else if (ev.key === "ContextMenu" || (ev.shiftKey && ev.key === "F10")) { ev.preventDefault(); keyMenu(); }
+  else if (mod && k === "a") { ev.preventDefault(); selectAll(); }
   else if (mod && k === "c") toClip("copy");
   else if (mod && k === "x") toClip("cut");
   else if (mod && k === "v") paste();
@@ -520,11 +625,15 @@ export function init() {
   $("fm-sel-clear").onclick = () => { sel.clear(); select(null, "none"); };
   $("fm-clip-clear").onclick = () => { clip = null; store(CLIP_KEY, null); render(); };
   $("fm-paste").onclick = paste;
-  const acts = { copy: () => toClip("copy"), cut: () => toClip("cut"), rename, download, delete: remove };
+  const acts = { copy: () => toClip("copy"), cut: () => toClip("cut"), path: () => copyPaths(selected()), rename, download, delete: remove };
   for (const b of $("fm-selbar").querySelectorAll("[data-act]")) b.onclick = acts[b.dataset.act];
   $("fm-sh-close").onclick = () => closeSheet();
   $("fm-sheet").addEventListener("click", (ev) => { if (ev.target.id === "fm-sheet") closeSheet(); });
   document.addEventListener("keydown", onKey);
+  // el menú se cierra al tocar fuera, al cambiar el tamaño o al irse a otra ventana
+  document.addEventListener("pointerdown", (ev) => { if (menuEl && !menuEl.contains(ev.target)) closeMenu(); }, true);
+  window.addEventListener("resize", closeMenu);
+  window.addEventListener("blur", closeMenu);
 }
 
 export function show(args = []) {
@@ -534,5 +643,6 @@ export function show(args = []) {
 }
 
 export function hide() {
+  closeMenu();
   closeSheet(true);
 }
