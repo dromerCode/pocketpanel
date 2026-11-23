@@ -26,10 +26,11 @@ class SSH:
                     raise SSHError(f"no conecta por SSH: {e}") from e
             return self._conn
 
-    async def run(self, cmd: str, timeout: float = 15) -> str:
+    async def run(self, cmd: str, timeout: float = 15, input: str | None = None) -> str:
+        """`input` va por la entrada estándar (para secretos: así no salen en la lista de procesos del host)."""
         c = await self.conn()
         try:
-            r = await asyncio.wait_for(c.run(cmd, check=False), timeout)
+            r = await asyncio.wait_for(c.run(cmd, check=False, input=input), timeout)
         except asyncio.TimeoutError as e:
             raise SSHError(f"tiempo agotado ({timeout:.0f} s): {cmd.strip().splitlines()[0][:60]}") from e
         except asyncssh.Error as e:
