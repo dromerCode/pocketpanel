@@ -312,8 +312,9 @@ function renderDev() {
   const box = $("cl-dev"), pb = S.pb;
   if (!pb) return box.replaceChildren(empty("Cargando…"));
   if (pb.failed) return box.replaceChildren(empty(`No se pudo leer: ${pb.failed}`));
-  const warn = pb.npm ? null : el("p", { class: "cl-note cl-warn", style: "margin:10px 14px" },
-    "Para crear pruebas falta conectar Nginx Proxy Manager: en ramnserver guarda su correo y su contraseña (una por línea) en ~/.config/npm-cred y haz chmod 600.");
+  const warn = pb.npm ? null : el("div", { class: "cl-note cl-warn", style: "margin:10px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between" },
+    el("span", {}, "Para crear pruebas falta conectar Nginx Proxy Manager, el proxy de casa."),
+    el("button", { class: "btn btn-sm btn-primary", type: "button", onclick: () => npmSheet() }, "Conectar"));
   if (!pb.items.length) return put(box, warn, empty("No hay ninguna prueba. Crea una con «+ Prueba» o desde un proyecto de producción con «Probar una rama»."));
   put(box, warn, pb.items.map((d) => {
     const [k, t] = devState(d);
@@ -328,6 +329,32 @@ function renderDev() {
         d.behind ? Object.assign(badge(`Cambios en ${d.branch}`, "warn"), { title: `En GitHub está ${d.remote}; «Actualizar» para bajarlo` }) : null,
         badge(t, k)));
   }));
+}
+
+/** Correo y contraseña de Nginx Proxy Manager: el host los comprueba contra NPM y solo los guarda si entran. */
+function npmSheet(then) {
+  initSheet();
+  const email = el("input", { type: "email", autocomplete: "username", autocapitalize: "none", spellcheck: "false", required: true });
+  const pass = el("input", { type: "password", autocomplete: "current-password", required: true });
+  const err = el("p", { class: "form-error", hidden: true });
+  const ok = el("button", { class: "btn btn-primary", type: "submit" }, "Comprobar y guardar");
+  const form = el("form", { class: "form" },
+    note("Los de tu cuenta de Nginx Proxy Manager (el panel de casa en el puerto 81). Con ellos el panel crea y quita el proxy de cada prueba."),
+    field("Correo", email), field("Contraseña", pass, "Se comprueba con Nginx Proxy Manager y se guarda solo en ramnserver (~/.config/npm-cred, permisos 600)."),
+    err, el("div", { class: "sheet-actions" }, el("button", { class: "btn", type: "button", onclick: closeSheet }, "Cancelar"), ok));
+  form.onsubmit = async (e) => {
+    e.preventDefault(); err.hidden = true; ok.disabled = true; ok.textContent = "Comprobando…";
+    try {
+      await api("/api/clientes/npm", { method: "POST", body: { email: email.value.trim(), password: pass.value } });
+      pass.value = "";
+      if (S.pb) S.pb.npm = true;
+      closeSheet(); toast("Nginx Proxy Manager conectado"); renderDev(); loadRest(true);
+      if (then) then();
+    } catch (e2) { err.textContent = e2.message; err.hidden = false; }
+    ok.disabled = false; ok.textContent = "Comprobar y guardar";
+  };
+  openSheet("Conectar Nginx Proxy Manager", then ? "Hace falta antes de crear la primera prueba" : "Para crear pruebas en casa", form);
+  email.focus();
 }
 
 function devSheet(name) {
@@ -451,6 +478,7 @@ function devEditForm(d) {
 }
 
 function devForm(preselect) {
+  if (S.pb && !S.pb.npm) return npmSheet(() => devForm(preselect));
   initSheet();
   const prod = S.pb?.production || S.st?.projects || [];
   const taken = new Set((S.pb?.items || []).map((x) => x.name));

@@ -58,6 +58,12 @@ def setup(ctx) -> APIRouter:
     async def logs(name: str, lines: int = 200, dev: bool = False):
         return {"lines": await call(cl.logs, name, lines, dev)}
 
+    @r.post("/npm")
+    async def npm(request: Request):
+        body = await json_body(request)
+        await call(cl.npm_cred, body.get("email"), body.get("password"))
+        return {"ok": True}
+
     @r.get("/pruebas")
     async def pruebas():
         return await call(cl.pruebas)

@@ -198,3 +198,35 @@ def test_build_action_pruebas():
                 {"action": "prueba-datos", "name": "gacha", "mode": "todo", "confirm": "gacha"}):
         with pytest.raises(ClientesError):
             build_action(bad)
+
+
+# ---------------------------------------------------------------- credenciales de Nginx Proxy Manager
+def test_npm_cred_input():
+    import pytest
+    from app.modules.clientes.clientes import ClientesError, npm_cred_input
+    assert npm_cred_input(" yo@example.com ", "a b|c'$x") == ("yo@example.com", "a b|c'$x")
+    for email, password in (("no-es-correo", "x"), ("yo@example.com", ""), ("yo@example.com", "a\nb"),
+                            ("yo@example.com", None), (None, "x"), ("a b@example.com", "x")):
+        with pytest.raises(ClientesError):
+            npm_cred_input(email, password)
+
+
+async def test_npm_cred_goes_by_stdin_not_in_the_command():
+    import pytest
+    from app.modules.clientes.clientes import Clientes, ClientesError
+
+    class FakeSSH:
+        def __init__(self, out):
+            self.out, self.calls = out, []
+
+        async def run(self, cmd, timeout=15, input=None):
+            self.calls.append((cmd, input))
+            return self.out
+
+    ssh = FakeSSH("ok\n")
+    await Clientes(ssh, "~/bin/clientes/panel.sh").npm_cred("yo@example.com", "s3creta")
+    cmd, stdin = ssh.calls[0]
+    assert cmd.endswith("npm-cred") and "s3creta" not in cmd and stdin == "yo@example.com\ns3creta\n"
+    with pytest.raises(ClientesError, match="no acepta"):
+        await Clientes(FakeSSH("Nginx Proxy Manager no acepta ese correo y contraseña\n"),
+                       "~/bin/clientes/panel.sh").npm_cred("yo@example.com", "mala")

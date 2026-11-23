@@ -399,6 +399,15 @@ def _path(value) -> str:
     return value
 
 
+def npm_cred_input(email, password) -> tuple[str, str]:
+    """Correo y contraseña de Nginx Proxy Manager: una línea cada uno, sin saltos de línea dentro."""
+    if not isinstance(email, str) or not re.fullmatch(r"[^\s@]+@[^\s@]+", email.strip()) or len(email) > 200:
+        raise ClientesError("correo no válido")
+    if not isinstance(password, str) or not password or len(password) > 200 or any(c in password for c in "\r\n\0"):
+        raise ClientesError("contraseña no válida")
+    return email.strip(), password
+
+
 def _branch(value) -> str:
     if not isinstance(value, str) or not BRANCH_RE.match(value) or value.startswith(("-", "/")) or ".." in value:
         raise ClientesError("rama no válida")
@@ -489,8 +498,8 @@ class Clientes:
         self.script = f'"$HOME/{script[2:]}"' if script.startswith("~/") else shlex.quote(script)
         self.ssh = ssh
 
-    async def sh(self, *args: str, timeout: float = 40) -> str:
-        return await self.ssh.run(" ".join([self.script, *(shlex.quote(a) for a in args)]), timeout=timeout)
+    async def sh(self, *args: str, timeout: float = 40, input: str | None = None) -> str:
+        return await self.ssh.run(" ".join([self.script, *(shlex.quote(a) for a in args)]), timeout=timeout, input=input)
 
     async def estado(self) -> dict:
         return parse_estado(await self.sh("estado"))
@@ -509,6 +518,13 @@ class Clientes:
 
     async def crons(self) -> dict:
         return parse_crons(await self.sh("crons"))
+
+    async def npm_cred(self, email, password) -> None:
+        """Guarda en el host las credenciales de Nginx Proxy Manager, si NPM las acepta (las comprueba el script)."""
+        email, password = npm_cred_input(email, password)
+        out = (await self.sh("npm-cred", timeout=20, input=f"{email}\n{password}\n")).strip()
+        if out.splitlines()[-1:] != ["ok"]:
+            raise ClientesError(out.splitlines()[-1] if out else "no se pudo guardar")
 
     async def pruebas(self) -> dict:
         return parse_pruebas(await self.sh("pruebas"))
