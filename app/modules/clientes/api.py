@@ -55,8 +55,16 @@ def setup(ctx) -> APIRouter:
         return await call(cl.crons)
 
     @r.get("/logs")
-    async def logs(name: str, lines: int = 200):
-        return {"lines": await call(cl.logs, name, lines)}
+    async def logs(name: str, lines: int = 200, dev: bool = False):
+        return {"lines": await call(cl.logs, name, lines, dev)}
+
+    @r.get("/pruebas")
+    async def pruebas():
+        return await call(cl.pruebas)
+
+    @r.get("/ramas")
+    async def ramas(repo: str):
+        return {"branches": await call(cl.ramas, repo)}
 
     @r.get("/job")
     async def job():

@@ -155,3 +155,46 @@ def test_odd_output_does_not_break_the_screen():
     dns = parse_dns('@@modo\nvm\n@@ip-vm\n1.2.3.4\n@@clientes\na.example.com|web\n@@zona\nexample.com\n'
                     '@@registros\n{"result": [{"id": 1}, {"type": "A", "name": "a.example.com", "content": "1.2.3.4"}]}\n')
     assert dns["records"][0]["why"] == "debería ir por Cloudflare (nube naranja)"
+
+
+# ---------------------------------------------------------------- pruebas (en desarrollo)
+PRUEBAS_OUT = """@@npm
+no
+@@copia
+2026-11-19 02:00:17
+
+@@produccion
+revigenda|ramn100dev/revigenda|docker|si|/login|8088
+ramndev|ramn100dev/ramndev-web|web|no|/|8085
+@@pruebas
+revigenda|ramn100dev/revigenda|docker|9088|revisiones-cliente|revigenda-test.ramndev.com|si|/login|running|Up 3 minutes|200|1111111|si|copia de producción del 2026-11-19|abc1234|1763500000|Arreglo | con barra
+nuevo|ramn100dev/nuevo|web|9080|main|nuevo.ramndev.com|no|/|exited|Exited (0)||?|no||def5678|1763400000|Primero
+"""
+
+
+def test_parse_pruebas():
+    from app.modules.clientes.clientes import parse_pruebas
+    d = parse_pruebas(PRUEBAS_OUT)
+    assert d["npm"] is False and d["backup_at"]
+    assert [p["name"] for p in d["production"]] == ["revigenda", "ramndev"]
+    a, b = d["items"]
+    assert a["ok"] and a["running"] and a["behind"] and a["in_prod"] and a["commit_msg"] == "Arreglo | con barra"
+    assert a["branch"] == "revisiones-cliente" and a["port"] == 9088
+    assert not b["running"] and not b["ok"] and b["remote"] is None and not b["behind"] and not b["in_prod"]
+
+
+def test_build_action_pruebas():
+    import pytest
+    from app.modules.clientes.clientes import ClientesError, build_action
+    assert build_action({"action": "prueba-crear", "name": "revigenda", "port": 9088, "branch": "feature/x",
+                         "domain": "revigenda-test.ramndev.com", "path": "/login", "mode": "copia"}) == \
+        ["prueba-crear", "revigenda", "-", "web", "9088", "feature/x", "revigenda-test.ramndev.com", "no", "/login", "copia"]
+    assert build_action({"action": "prueba-actualizar", "name": "gacha", "branch": "main"}) == ["prueba-actualizar", "gacha", "main"]
+    assert build_action({"action": "prueba-datos", "name": "gacha", "mode": "vacios", "confirm": "gacha"}) == ["prueba-datos", "gacha", "vacios"]
+    for bad in ({"action": "prueba-actualizar", "name": "gacha", "branch": "--upload-pack=x"},
+                {"action": "prueba-actualizar", "name": "gacha", "branch": "a/../b"},
+                {"action": "prueba-crear", "name": "x1", "port": 9000, "branch": "main", "domain": "a.com b.com"},
+                {"action": "prueba-quitar", "name": "gacha", "confirm": "otro"},
+                {"action": "prueba-datos", "name": "gacha", "mode": "todo", "confirm": "gacha"}):
+        with pytest.raises(ClientesError):
+            build_action(bad)

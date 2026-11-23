@@ -18,6 +18,7 @@ REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 PATH_RE = re.compile(r"^/[A-Za-z0-9/_.-]*$")
 DOMAIN_RE = re.compile(r"^([a-z0-9-]+\.)+[a-z]{2,}$")
 SNAP_RE = re.compile(r"^[0-9a-f]{8,64}$")
+BRANCH_RE = re.compile(r"^[A-Za-z0-9._/-]{1,100}$")
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 SCRIPT_RE = re.compile(r"^[A-Za-z0-9_./~-]+$")
 EVENT_RE = re.compile(r"^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\] (.*)$")
@@ -173,6 +174,9 @@ def parse_dns(out: str) -> dict:
     for line in first(secs, "clientes"):
         name, _, proj = line.partition("|")
         want[name] = ("cliente", proj, home_ip if mode == "casa" else vm_ip, True)
+    for line in first(secs, "pruebas"):
+        name, _, proj = line.partition("|")
+        want[name] = ("prueba", proj, home_ip, True)
 
     found, zones, zone, flag, errors = {}, [], None, False, []
     for sec, lines in secs:
@@ -319,6 +323,33 @@ def parse_crons(out: str) -> dict:
     return {"crons": crons, "now": now, "errors": err}
 
 
+def parse_pruebas(out: str) -> dict:
+    """Los proyectos en desarrollo (en casa) y lo que hace falta para crear uno."""
+    secs = sections(out)
+    prod = []
+    for line in first(secs, "produccion"):
+        f = line.split("|")
+        if len(f) >= 6:
+            prod.append({"name": f[0], "repo": f[1], "type": f[2], "data": f[3] == "si", "path": f[4], "port": _int(f[5])})
+    items = []
+    for line in first(secs, "pruebas"):
+        f = line.split("|", 16)
+        if len(f) < 17:
+            continue
+        http = f[10] or None
+        it = {"name": f[0], "repo": f[1], "type": f[2], "port": _int(f[3]), "branch": f[4], "domain": f[5],
+              "data": f[6] == "si", "path": f[7], "state": f[8] or None, "status": f[9], "http": http,
+              "remote": None if f[11] in ("", "?") else f[11], "in_prod": f[12] == "si", "origin": f[13] or None,
+              "commit": f[14] or None, "commit_at": _int(f[15]) or None, "commit_msg": f[16]}
+        it["running"] = it["state"] == "running"
+        it["ok"] = it["running"] and http in OK_HTTP
+        it["behind"] = bool(it["remote"] and it["commit"] and not it["remote"].startswith(it["commit"][:7]))
+        items.append(it)
+    copia = "".join(first(secs, "copia")).strip()
+    return {"npm": (first(secs, "npm") or ["no"])[0] == "si", "backup_at": _ts(copia) if copia else None,
+            "production": prod, "items": items}
+
+
 def parse_job(out: str) -> dict | None:
     """El registro de la última acción → {status, name, lines} como las demás tareas (watchJob)."""
     if out.startswith("@none"):
@@ -368,6 +399,19 @@ def _path(value) -> str:
     return value
 
 
+def _branch(value) -> str:
+    if not isinstance(value, str) or not BRANCH_RE.match(value) or value.startswith(("-", "/")) or ".." in value:
+        raise ClientesError("rama no válida")
+    return value
+
+
+def _one_domain(value) -> str:
+    d = _domains(value if isinstance(value, str) else "")
+    if " " in d:
+        raise ClientesError("una prueba lleva un solo dominio")
+    return d
+
+
 def _name(value, extra=()) -> str:
     if not isinstance(value, str) or not (NAME_RE.match(value) or value in extra):
         raise ClientesError("nombre de proyecto no válido")
@@ -400,6 +444,32 @@ def build_action(b: dict) -> list[str]:
         return [a, name, snap]
     if a == "editar":
         return [a, _name(b.get("name")), _port(b.get("port")), _path(b.get("path")), _domains(b.get("domains"))]
+    if a in ("prueba-encender", "prueba-apagar"):
+        return [a, _name(b.get("name"))]
+    if a == "prueba-actualizar":
+        return [a, _name(b.get("name")), _branch(b.get("branch"))]
+    if a == "prueba-editar":
+        return [a, _name(b.get("name")), _one_domain(b.get("domain")), _path(b.get("path"))]
+    if a in ("prueba-quitar", "prueba-datos"):
+        name = _name(b.get("name"))
+        if b.get("confirm") != name:
+            raise ClientesError(f"para confirmar hay que escribir «{name}»")
+        if a == "prueba-quitar":
+            return [a, name]
+        if b.get("mode") not in ("vacios", "copia"):
+            raise ClientesError("datos: vacíos o copia")
+        return [a, name, b["mode"]]
+    if a == "prueba-crear":
+        repo, kind = b.get("repo") or "-", b.get("type") or "web"
+        if repo != "-" and not REPO_RE.match(str(repo)):
+            raise ClientesError("el repositorio va como usuario/repo")
+        if kind not in ("docker", "web"):
+            raise ClientesError("el tipo es docker o web")
+        if b.get("mode", "vacios") not in ("vacios", "copia"):
+            raise ClientesError("datos iniciales: vacíos o copia")
+        return [a, _name(b.get("name")), repo, kind, _port(b.get("port")), _branch(b.get("branch")),
+                _one_domain(b.get("domain")), "si" if b.get("data") else "no", _path(b.get("path") or "/"),
+                b.get("mode", "vacios")]
     if a == "nuevo":
         repo, kind = b.get("repo"), b.get("type")
         if not isinstance(repo, str) or not REPO_RE.match(repo):
@@ -440,7 +510,19 @@ class Clientes:
     async def crons(self) -> dict:
         return parse_crons(await self.sh("crons"))
 
-    async def logs(self, name: str, lines: int) -> list[str]:
+    async def pruebas(self) -> dict:
+        return parse_pruebas(await self.sh("pruebas"))
+
+    async def ramas(self, repo: str) -> list[str]:
+        if not isinstance(repo, str) or not REPO_RE.match(repo):
+            raise ClientesError("el repositorio va como usuario/repo")
+        out = await self.sh("ramas", repo, timeout=30)
+        return [x.strip() for x in out.splitlines() if BRANCH_RE.match(x.strip())]
+
+    async def logs(self, name: str, lines: int, dev: bool = False) -> list[str]:
+        if dev:
+            out = await self.sh("logs-prueba", _name(name), str(max(10, min(lines, 2000))))
+            return out.rstrip("\n").splitlines()
         out = await self.sh("logs", _name(name, extra=("proxy",)), str(max(10, min(lines, 2000))))
         return out.rstrip("\n").splitlines()
 

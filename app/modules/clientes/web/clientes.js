@@ -4,7 +4,7 @@ import { closeRunner, closeSheet, initSheet, openRunner, openSheet, runnerOut, s
 
 const $ = (id) => document.getElementById(id);
 const DONE = { ok: ["✓ terminado", true], failed: ["✗ ha fallado (mira arriba por qué)", false] };
-const S = { st: null, ver: null, bk: null, dns: null, cron: null, ev: null };
+const S = { st: null, ver: null, bk: null, dns: null, cron: null, ev: null, pb: null };
 let timer = null;        // refresco mientras la pestaña está abierta
 let jobWas = false;      // había una acción en marcha la última vez que se miró
 let evFilter = "main";
@@ -55,6 +55,7 @@ function loadRest(fresh = false) {
   get("dns", "/api/clientes/dns", renderDns);
   get("cron", "/api/clientes/crons", renderCrons);
   get("ev", "/api/clientes/sucesos", renderEvents);
+  get("pb", "/api/clientes/pruebas", renderDev);
 }
 
 function schedule() {
@@ -192,6 +193,7 @@ function projectSheet(name) {
       btn("Reiniciar", () => confirm(`¿Reiniciar ${p.name}? La web se corta unos segundos.`) && run({ action: "reiniciar", name: p.name })),
       btn("Desplegar ahora", () => confirm(`¿Publicar ahora lo que haya en main de ${p.repo}?\n\nNormalmente se publica solo cada noche. Si la versión nueva falla, se vuelve sola a la anterior.`) && run({ action: "desplegar", name: p.name })),
       btn("Editar", () => editForm(p)),
+      btn("Probar una rama", () => { const d = S.pb?.items?.find((x) => x.name === p.name); d ? devSheet(d.name) : devForm(p.name); }),
       p.data ? btn("Restaurar una copia", () => restoreSheet(p)) : null,
       btn("Quitar proyecto", () => removeSheet(p), "btn-danger"))));
 }
@@ -223,7 +225,7 @@ function restoreSheet(p) {
     el("div", { class: "sheet-actions" }, el("button", { class: "btn", type: "button", onclick: closeSheet }, "Cancelar"), next)));
 }
 
-function projectForm({ title, sub, p, submit, action }) {
+function projectForm({ title, sub, p, submit, action, preset = {} }) {
   initSheet();
   const isNew = !p;
   const used = (S.st?.projects || []).map((x) => x.port);
@@ -234,13 +236,18 @@ function projectForm({ title, sub, p, submit, action }) {
   const data = el("input", { type: "checkbox" });
   const path = el("input", { type: "text", autocapitalize: "none", spellcheck: "false", value: p ? p.path : "/" });
   const domains = el("textarea", { rows: 3, autocapitalize: "none", spellcheck: "false", placeholder: "mitienda.com\nwww.mitienda.com" }, p ? p.domains.join("\n") : "");
+  if (preset.name) name.value = preset.name;
+  if (preset.repo) repo.value = preset.repo;
+  if (preset.type) type.value = preset.type;
+  if (preset.path) path.value = preset.path;
+  if (preset.data) data.checked = true;
   const err = el("p", { class: "form-error", hidden: true });
   const ok = el("button", { class: "btn btn-primary", type: "submit" }, action);
   const form = el("form", { class: "form" },
     isNew ? field("Nombre", name, "Corto, en minúsculas. Será el nombre del contenedor y de sus carpetas.") : null,
     isNew ? field("Repositorio de GitHub", repo, "Se publica lo que haya en la rama main.") : null,
     isNew ? field("Tipo", type) : null,
-    field("Dominios", domains, "Uno por línea. El primero es el principal. El dominio tiene que estar ya en tu Cloudflare."),
+    field("Dominios", domains, "Uno por línea. El primero es el principal: si cambia, las URL del .env que apuntaban al viejo (p. ej. URL_PUBLICA) pasan a él. El dominio tiene que estar ya en tu Cloudflare."),
     field("Puerto interno", port, "Un puerto libre, distinto para cada proyecto. No se ve desde fuera."),
     field("Ruta de comprobación", path, "La dirección que debe responder para darlo por vivo (p. ej. / o /login)."),
     isNew ? el("label", { class: "cl-check" }, data, "Guarda datos (se copian cada noche y se llevan en los relevos)") : null,
@@ -263,8 +270,8 @@ function projectForm({ title, sub, p, submit, action }) {
   openSheet(title, sub, form);
 }
 
-function newForm() {
-  projectForm({
+function newForm(preset) {
+  projectForm({ preset: preset || {},
     title: "Proyecto nuevo", sub: "Se clona, se publica en la VM, se crea su DNS y entra en copias y vigilancia", action: "Dar de alta",
     submit: async (b) => {
       const r = await api("/api/clientes/run", { method: "POST", body: { action: "nuevo", ...b } });
@@ -287,16 +294,253 @@ function editForm(p) {
   });
 }
 
+/* ---------------------------------------------------------------- en desarrollo (pruebas en casa) */
+
+function startJob(r) {
+  closeSheet();
+  jobWas = true;
+  watchJob("/api/clientes/job", r.name, DONE, () => { jobWas = false; loadStatus(); loadRest(true); });
+}
+
+function devState(d) {
+  if (!d.state) return ["", "Sin contenedor"];
+  if (!d.running) return ["", "Apagada"];
+  return d.ok ? ["ok", "Encendida"] : ["bad", `No responde${d.http ? ` (${d.http})` : ""}`];
+}
+
+function renderDev() {
+  const box = $("cl-dev"), pb = S.pb;
+  if (!pb) return box.replaceChildren(empty("Cargando…"));
+  if (pb.failed) return box.replaceChildren(empty(`No se pudo leer: ${pb.failed}`));
+  const warn = pb.npm ? null : el("p", { class: "cl-note cl-warn", style: "margin:10px 14px" },
+    "Para crear pruebas falta conectar Nginx Proxy Manager: en ramnserver guarda su correo y su contraseña (una por línea) en ~/.config/npm-cred y haz chmod 600.");
+  if (!pb.items.length) return put(box, warn, empty("No hay ninguna prueba. Crea una con «+ Prueba» o desde un proyecto de producción con «Probar una rama»."));
+  put(box, warn, pb.items.map((d) => {
+    const [k, t] = devState(d);
+    return el("button", { class: "cl-row cl-proj", type: "button", onclick: () => devSheet(d.name) },
+      el("span", { class: `dot ${d.ok ? "" : "off"}` }),
+      el("div", { class: "cl-main" }, el("span", { class: "cl-name" }, d.name, d.in_prod ? null : el("span", { class: "muted small" }, "  · nuevo")),
+        el("span", { class: "cl-sub" }, d.domain)),
+      el("div", { class: "cl-ver" },
+        el("span", { class: "cl-sub mono" }, `⎇ ${d.branch} · ${d.commit || "–"}${d.commit_at ? ` · ${fmtAgo(d.commit_at)}` : ""}`),
+        el("span", { class: "cl-sub", title: d.commit_msg }, d.commit_msg || "")),
+      el("div", { class: "cl-right" },
+        d.behind ? Object.assign(badge(`Cambios en ${d.branch}`, "warn"), { title: `En GitHub está ${d.remote}; «Actualizar» para bajarlo` }) : null,
+        badge(t, k)));
+  }));
+}
+
+function devSheet(name) {
+  const d = S.pb?.items?.find((x) => x.name === name);
+  if (!d) return;
+  initSheet();
+  const [k, t] = devState(d);
+  const prod = S.st?.projects?.find((p) => p.name === d.name);
+  const btn = (text, fn, cls = "") => el("button", { class: `btn ${cls}`, type: "button", onclick: fn }, text);
+  const url = `https://${d.domain}${d.path}`;
+  openSheet(`${d.name} · prueba`, d.domain, el("div", { class: "cl-sheet" },
+    el("dl", { class: "cl-kv" },
+      el("dt", {}, "Estado"), el("dd", { class: k ? `cl-${k}` : "" }, d.running ? `${t} · ${d.status}` : t),
+      el("dt", {}, "Dirección"), el("dd", {}, el("a", { class: "link", href: url, target: "_blank", rel: "noopener" }, url)),
+      el("dt", {}, "Rama"), el("dd", { class: "mono" }, d.branch),
+      el("dt", {}, "Versión"), el("dd", {}, d.commit ? `${d.commit} · ${d.commit_msg}${d.commit_at ? ` (${fmtAgo(d.commit_at)})` : ""}` : "–"),
+      el("dt", {}, "Frente a GitHub"), el("dd", { class: d.behind ? "cl-warn" : "" }, !d.remote ? "GitHub no responde" : d.behind ? `hay cambios (${d.remote}); «Actualizar» para bajarlos` : "al día"),
+      el("dt", {}, "Repositorio"), el("dd", {}, el("a", { class: "link", href: `https://github.com/${d.repo}/tree/${d.branch}`, target: "_blank", rel: "noopener" }, d.repo)),
+      el("dt", {}, "Producción"), el("dd", {}, d.in_prod ? `sí (${prod ? prod.domains[0] : "en la VM"}); esta prueba no la toca` : "todavía no está en producción"),
+      el("dt", {}, "Datos"), el("dd", {}, d.data ? (d.origin || "propios de la prueba") : "no guarda datos"),
+      el("dt", {}, "Puerto en casa"), el("dd", {}, String(d.port)),
+      el("dt", {}, "Variables"), el("dd", { class: "mono" }, `~/.config/clientes/env-pruebas/${d.name}.env`)),
+    el("div", { class: "btn-row" },
+      el("a", { class: "btn", href: url, target: "_blank", rel: "noopener" }, "Abrir"),
+      d.running
+        ? btn("Apagar", () => run({ action: "prueba-apagar", name: d.name }))
+        : btn("Encender", () => run({ action: "prueba-encender", name: d.name }), "btn-primary"),
+      btn("Actualizar / cambiar de rama", () => branchSheet(d)),
+      btn("Ver logs", () => { closeSheet(); showLogs(d.name, true); }),
+      d.data ? btn("Datos", () => dataSheet(d)) : null,
+      btn("Editar", () => devEditForm(d)),
+      d.in_prod ? null : btn("Publicar en producción", () => newForm({ name: d.name, repo: d.repo, type: d.type, path: d.path, data: d.data })),
+      btn("Quitar prueba", () => confirmSheet(`Quitar la prueba de ${d.name}`, d.name, [
+        `Se para y se borra el contenedor, su código y SUS DATOS DE PRUEBA, y se quitan ${d.domain} del DNS y del proxy de casa.`,
+        d.in_prod ? "Producción no se toca." : "El repositorio de GitHub no se toca.",
+        "Las variables se guardan por si la vuelves a crear.",
+      ], "Quitar", () => run({ action: "prueba-quitar", name: d.name, confirm: d.name })), "btn-danger"))));
+}
+
+/** Selector de rama: se rellena con las ramas de GitHub; si no se pueden leer, se escribe a mano. */
+function branchPicker(repo, current) {
+  const wrap = el("div", {});
+  let input = el("select", { disabled: true }, el("option", { value: current || "" }, current ? `${current} (cargando ramas…)` : "cargando ramas…"));
+  wrap.append(input);
+  let seq = 0;  // si se pide otra vez (otro proyecto), la respuesta vieja no pisa a la nueva
+  const typed = () => {
+    const txt = el("input", { type: "text", autocapitalize: "none", spellcheck: "false", value: current || "main", placeholder: "nombre-de-la-rama" });
+    wrap.replaceChildren(txt);
+    input = txt;
+  };
+  const load = async (r) => {
+    const mine = ++seq;
+    if (!r || !/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(r)) return typed();
+    try {
+      const { branches } = await api(`/api/clientes/ramas?repo=${encodeURIComponent(r)}`);
+      if (mine !== seq) return;
+      if (!branches.length) throw new Error("sin ramas");
+      const want = branches.includes(current) ? current : branches.includes("main") ? "main" : branches[0];
+      const sel = el("select", {}, branches.map((b) => el("option", { value: b }, b)));
+      sel.value = want;
+      wrap.replaceChildren(sel);
+      input = sel;
+    } catch {
+      if (mine === seq) typed();
+    }
+  };
+  load(repo);
+  return { node: wrap, value: () => input.value.trim(), load };
+}
+
+function branchSheet(d) {
+  initSheet();
+  const pick = branchPicker(d.repo, d.branch);
+  const ok = el("button", { class: "btn btn-primary", type: "button" }, "Bajar y reconstruir");
+  ok.onclick = async () => { ok.disabled = true; if (!(await run({ action: "prueba-actualizar", name: d.name, branch: pick.value() }))) ok.disabled = false; };
+  openSheet(`Actualizar la prueba de ${d.name}`, d.repo, el("div", { class: "cl-sheet form" },
+    note("Baja lo último de la rama elegida desde GitHub, reconstruye y arranca. Los datos de la prueba no se tocan."),
+    field("Rama", pick.node, `Ahora: ${d.branch}. Sube antes tus cambios con git push.`),
+    el("div", { class: "sheet-actions" }, el("button", { class: "btn", type: "button", onclick: closeSheet }, "Cancelar"), ok)));
+}
+
+function dataSheet(d) {
+  initSheet();
+  const canCopy = d.in_prod && (S.pb?.production || []).some((p) => p.name === d.name && p.data);
+  let mode = "vacios";
+  const opt = (value, title, text, disabled) => el("label", { class: "cl-check", style: "align-items:flex-start" },
+    el("input", { type: "radio", name: "cl-dmode", value, checked: value === "vacios", disabled, onchange: () => { mode = value; } }),
+    el("span", {}, el("b", {}, title), el("br"), el("span", { class: "muted small" }, text)));
+  const next = el("button", { class: "btn btn-primary", type: "button" }, "Continuar");
+  next.onclick = () => confirmSheet(`Datos de la prueba de ${d.name}`, d.name, [
+    mode === "copia"
+      ? `Los datos de la prueba se sustituyen por la última copia de producción${S.pb?.backup_at ? ` (${when(S.pb.backup_at)})` : ""}, sin suscripciones push ni claves de avisos: la prueba no puede mandar nada a tus clientes.`
+      : "Los datos de la prueba se borran y empieza de cero.",
+    "Producción no se toca. Los datos de prueba de ahora se guardan una vez (.anterior) por si acaso.",
+  ], "Cambiar los datos", () => run({ action: "prueba-datos", name: d.name, mode, confirm: d.name }));
+  openSheet(`Datos de la prueba de ${d.name}`, d.origin || "", el("div", { class: "cl-sheet" },
+    opt("vacios", "Vacíos", "Empieza de cero. Lo más seguro."),
+    opt("copia", "Copia de producción sin avisos", canCopy
+      ? "Los datos reales de la última copia, sin suscripciones push ni claves de avisos. Para reproducir un fallo."
+      : "Solo para proyectos de producción que guardan datos.", !canCopy),
+    el("div", { class: "sheet-actions" }, el("button", { class: "btn", type: "button", onclick: closeSheet }, "Cancelar"), next)));
+}
+
+function devEditForm(d) {
+  initSheet();
+  const domain = el("input", { type: "text", autocapitalize: "none", spellcheck: "false", value: d.domain });
+  const path = el("input", { type: "text", autocapitalize: "none", spellcheck: "false", value: d.path });
+  const err = el("p", { class: "form-error", hidden: true });
+  const ok = el("button", { class: "btn btn-primary", type: "submit" }, "Guardar");
+  const form = el("form", { class: "form" },
+    field("Subdominio", domain, "Si lo cambias, se crea el DNS y el proxy del nuevo y se quita el viejo. Las URL del .env de la prueba pasan al nuevo."),
+    field("Ruta de comprobación", path), err,
+    el("div", { class: "sheet-actions" }, el("button", { class: "btn", type: "button", onclick: closeSheet }, "Cancelar"), ok));
+  form.onsubmit = async (e) => {
+    e.preventDefault(); err.hidden = true; ok.disabled = true;
+    try { startJob(await api("/api/clientes/run", { method: "POST", body: { action: "prueba-editar", name: d.name, domain: domain.value.trim().toLowerCase(), path: path.value.trim() } })); }
+    catch (e2) { err.textContent = e2.message; err.hidden = false; }
+    ok.disabled = false;
+  };
+  openSheet(`Editar la prueba de ${d.name}`, "", form);
+}
+
+function devForm(preselect) {
+  initSheet();
+  const prod = S.pb?.production || S.st?.projects || [];
+  const taken = new Set((S.pb?.items || []).map((x) => x.name));
+  const usedPorts = new Set([...(S.st?.projects || []).map((p) => p.port), ...(S.pb?.items || []).map((x) => x.port)]);
+  const usedDomains = new Map();
+  for (const p of S.st?.projects || []) for (const dm of p.domains) usedDomains.set(dm, `lo usa ${p.name} en producción`);
+  for (const x of S.pb?.items || []) usedDomains.set(x.domain, `lo usa la prueba de ${x.name}`);
+  const freePort = (base) => { let p = base; while (usedPorts.has(p)) p += 1; return p; };
+
+  const which = el("select", {},
+    prod.filter((p) => !taken.has(p.name)).map((p) => el("option", { value: p.name }, `${p.name} (de producción)`)),
+    el("option", { value: "" }, "Proyecto nuevo (aún no está en producción)"));
+  if (preselect) which.value = preselect;
+  const name = el("input", { type: "text", autocapitalize: "none", spellcheck: "false", placeholder: "miproyecto" });
+  const repo = el("input", { type: "text", autocapitalize: "none", spellcheck: "false", placeholder: "usuario/repositorio" });
+  const type = el("select", {}, el("option", { value: "web" }, "Web estática (HTML, se sirve con nginx)"), el("option", { value: "docker" }, "Aplicación con Dockerfile"));
+  const data = el("input", { type: "checkbox" });
+  const domain = el("input", { type: "text", autocapitalize: "none", spellcheck: "false" });
+  const domHelp = el("span", { class: "help" });
+  const port = el("input", { type: "number", min: "1024", max: "65535" });
+  const path = el("input", { type: "text", autocapitalize: "none", spellcheck: "false", value: "/" });
+  const mode = el("select", {}, el("option", { value: "vacios" }, "Vacíos (empieza de cero)"), el("option", { value: "copia" }, "Copia de producción sin avisos"));
+  const pick = branchPicker(null, "main");
+  const err = el("p", { class: "form-error", hidden: true });
+  const ok = el("button", { class: "btn btn-primary", type: "submit" }, "Crear y arrancar");
+  let domTouched = false;
+
+  const newOnly = [field("Nombre", name, "Corto, en minúsculas."), field("Repositorio de GitHub", repo), field("Tipo", type),
+    el("div", {}, el("label", { class: "cl-check" }, data, "Guarda datos (en /data)"))];
+  const modeField = field("Datos iniciales", mode, "La copia no lleva suscripciones push ni claves de avisos: la prueba no puede escribir a tus clientes.");
+  const checkDomain = () => {
+    const v = domain.value.trim().toLowerCase(), why = usedDomains.get(v);
+    domHelp.textContent = why ? `⚠ ${v} ${why}. Elige otro (p. ej. ${v.split(".")[0]}-test.${v.split(".").slice(1).join(".")}).` : "Por defecto en ramndev.com (con -test si ya está en producción). Puedes poner otro.";
+    domHelp.className = why ? "help cl-bad" : "help";
+  };
+  const sync = () => {
+    const p = prod.find((x) => x.name === which.value);
+    for (const f of newOnly) f.style.display = p ? "none" : "";
+    modeField.style.display = p && p.data ? "" : "none";
+    const n = p ? p.name : name.value.trim();
+    if (!domTouched) domain.value = n ? `${n}${p ? "-test" : ""}.ramndev.com` : "";
+    if (p) { port.value = freePort(p.port + 1000); path.value = p.path; pick.load(p.repo); }
+    else if (!port.value || usedPorts.has(Number(port.value))) port.value = freePort(9080);
+    checkDomain();
+  };
+  which.onchange = () => {
+    domTouched = false;
+    if (!which.value) { path.value = "/"; port.value = freePort(9080); loadRepo(); }
+    sync();
+  };
+  name.oninput = sync;
+  const loadRepo = () => pick.load(repo.value.trim().replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, ""));
+  repo.onchange = loadRepo;
+  domain.oninput = () => { domTouched = true; checkDomain(); };
+
+  const form = el("form", { class: "form" },
+    field("Proyecto", which), ...newOnly,
+    field("Rama", pick.node, "Se baja de GitHub: sube antes tus cambios con git push."),
+    el("label", {}, "Subdominio", domain, domHelp),
+    field("Puerto en casa", port, "Libre y distinto de los de producción. No se ve desde fuera."),
+    field("Ruta de comprobación", path),
+    modeField, err,
+    el("div", { class: "sheet-actions" }, el("button", { class: "btn", type: "button", onclick: closeSheet }, "Cancelar"), ok));
+  form.onsubmit = async (e) => {
+    e.preventDefault(); err.hidden = true;
+    const p = prod.find((x) => x.name === which.value);
+    const body = { action: "prueba-crear", port: Number(port.value), branch: pick.value(), domain: domain.value.trim().toLowerCase(),
+      path: path.value.trim() || "/", mode: p && p.data ? mode.value : "vacios" };
+    if (p) Object.assign(body, { name: p.name });
+    else Object.assign(body, { name: name.value.trim(), repo: repo.value.trim().replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, ""), type: type.value, data: data.checked });
+    ok.disabled = true;
+    try { startJob(await api("/api/clientes/run", { method: "POST", body })); }
+    catch (e2) { err.textContent = e2.message; err.hidden = false; }
+    ok.disabled = false;
+  };
+  openSheet("Prueba nueva", "Una rama servida desde casa en su subdominio, con sus propios datos", form);
+  sync();
+  if (!which.value) loadRepo();
+}
+
 /* ---------------------------------------------------------------- logs */
 
-function showLogs(name) {
+function showLogs(name, dev = false) {
   let t = null, stop = false;
-  openRunner(`Logs de ${name}`, "cargando…", () => { stop = true; clearTimeout(t); });
+  openRunner(`Logs de ${name}${dev ? " (prueba)" : ""}`, "cargando…", () => { stop = true; clearTimeout(t); });
   const poll = async () => {
     if (stop) return;
     if (!document.hidden) {
       try {
-        const r = await api(`/api/clientes/logs?name=${encodeURIComponent(name)}&lines=300`);
+        const r = await api(`/api/clientes/logs?name=${encodeURIComponent(name)}&lines=300${dev ? "&dev=1" : ""}`);
         if (stop) return;
         const out = $("run-out"), stuck = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
         const top = out.scrollTop;
@@ -387,7 +631,7 @@ function renderDns() {
   const rows = d.records.map((r) => el("div", { class: "cl-row cl-wrap" },
     el("span", { class: `cl-cloud ${r.proxied ? "orange" : ""}`, title: r.proxied ? "Nube naranja: pasa por Cloudflare" : "Nube gris: va directo" }),
     el("div", { class: "cl-main" }, el("span", { class: "cl-name" }, r.name),
-      el("span", { class: "cl-sub" }, r.content ? `${r.type} → ${r.content} (${where(r.content)})${r.kind === "casa" ? " · siempre a casa" : ""}` : "no existe"),
+      el("span", { class: "cl-sub" }, r.content ? `${r.type} → ${r.content} (${where(r.content)})${r.kind === "casa" ? " · siempre a casa" : r.kind === "prueba" ? ` · prueba de ${r.project} (casa)` : ""}` : "no existe"),
       r.ok ? null : el("span", { class: "cl-sub cl-bad" }, r.why)),
     el("div", { class: "cl-right" }, badge(r.ok ? "✓" : "✗", r.ok ? "ok" : "bad"))));
   const fixable = wrong.some((r) => r.kind === "cliente");
@@ -485,7 +729,8 @@ export async function loadCard() {
 export function init() {
   initSheet();
   $("cl-refresh").onclick = () => { loadStatus(); loadRest(true); toast("Comprobando…"); };
-  $("cl-new").onclick = newForm;
+  $("cl-new").onclick = () => newForm();
+  $("cl-new-dev").onclick = () => devForm();
   $("cl-job").onclick = () => watchJob("/api/clientes/job", S.st?.job?.name || "En marcha", DONE, () => { jobWas = false; loadStatus(); loadRest(true); });
   for (const b of document.querySelectorAll("#cl-ev-filter .seg-btn")) b.onclick = () => { evFilter = b.dataset.f; evMore = false; renderEvents(); };
 }
